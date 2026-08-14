@@ -37,10 +37,27 @@
   *
  **/
 void VSocket::Init( char t, bool IPv6 ){
+   this->IPv6 = IPv6;
+   this->type = t;  
+   this->port = 0;
 
-   int st = -1;
+   int st; //socket type
 
-   if ( -1 == st ) {
+   if (t == 's') {
+      st = SOCK_STREAM;
+   }
+   else if (t == 'd') {
+      st = SOCK_DGRAM;
+   }
+   else {
+      throw std::runtime_error( "VSocket::Init, invalid socket type" );
+   }
+
+   int domain = IPv6 ? AF_INET6 : AF_INET;
+   this->sockId = socket( domain, st, 0 );
+
+
+   if ( -1 == this->sockId ) {
       throw std::runtime_error( "VSocket::Init, (reason)" );
    }
 
