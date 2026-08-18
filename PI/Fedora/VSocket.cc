@@ -17,12 +17,8 @@
 #include <cstring>		// memset
 #include <netdb.h>		// getaddrinfo, freeaddrinfo
 #include <unistd.h>		// close
-/*
-#include <cstddef>
-#include <cstdio>
+#include <cerrno>      // errno
 
-//#include <sys/types.h>
-*/
 #include "VSocket.h"
 
 
@@ -166,9 +162,32 @@ int VSocket::TryToConnect( const char * hostip, int port ) {
   *
  **/
 int VSocket::TryToConnect( const char *host, const char *service ) {
-   int st = -1;
+   struct addrinfo hints;
+   struct addrinfo * res = nullptr;
+   struct addrinfo * rp  = nullptr;
 
-   throw std::runtime_error( "VSocket::TryToConnect" );
+   memset( &hints, 0, sizeof( hints ) );
+   hints.ai_family   = IPv6 ? AF_INET6 : AF_INET;
+   hints.ai_socktype = ( 's' == type ) ? SOCK_STREAM : SOCK_DGRAM;
+
+   int st = getaddrinfo( host, service, &hints, &res );
+   if ( 0 != st ) {
+      throw std::runtime_error( std::string( "VSocket::TryToConnect, getaddrinfo: " ) + gai_strerror( st ) );
+   }
+
+   int connected = -1;
+   for ( rp = res; nullptr != rp; rp = rp->ai_next ) {
+      connected = connect( sockId, rp->ai_addr, rp->ai_addrlen );
+      if ( -1 != connected ) {
+         break;   // conexion exitosa con esta direccion
+      }
+   }
+
+   freeaddrinfo( res );
+
+   if ( -1 == connected ) {
+      throw std::runtime_error( std::string( "VSocket::TryToConnect, connect: " ) + strerror( errno ) );
+   }
 
    return st;
 

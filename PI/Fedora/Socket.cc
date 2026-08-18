@@ -16,6 +16,7 @@
 #include <unistd.h>		// write, read
 #include <cstring>
 #include <stdexcept>
+#include <cerrno>
 #include <stdio.h>		// printf
 
 #include "Socket.h"		// Derived class
@@ -88,13 +89,26 @@ int Socket::Connect( const char *host, const char *service ) {
  **/
 size_t Socket::Read( void * buffer, size_t size ) {
 
-   int st = -1;
+   size_t total = 0;
+   char * buf = (char *) buffer;
 
-   if ( -1 == st ) {
-      throw std::runtime_error( "Socket::Read( void *, size_t )" );
+   while ( total < size ) {
+
+      ssize_t n = read( sockId, buf + total, size - total );
+
+      if ( -1 == n ) {
+         throw std::runtime_error( std::string( "Socket::Read: " ) + strerror( errno ) );
+      }
+
+      if ( 0 == n ) {
+         break;   // el otro extremo cerró la conexion
+      }
+
+      total += (size_t) n;
+
    }
 
-   return st;
+   return total;
 
 }
 
@@ -109,13 +123,22 @@ size_t Socket::Read( void * buffer, size_t size ) {
  **/
 size_t Socket::Write( const void * buffer, size_t size ) {
 
-   int st = -1;
+   size_t total = 0;
+   const char * buf = (const char *) buffer;
 
-   if ( -1 == st ) {
-      throw std::runtime_error( "Socket::Write( void *, size_t )" );
+   while ( total < size ) {
+
+      ssize_t n = write( sockId, buf + total, size - total );
+
+      if ( -1 == n ) {
+         throw std::runtime_error( std::string( "Socket::Write: " ) + strerror( errno ) );
+      }
+
+      total += (size_t) n;
+
    }
 
-   return st;
+   return total;
 
 }
 
@@ -129,13 +152,7 @@ size_t Socket::Write( const void * buffer, size_t size ) {
  **/
 size_t Socket::Write( const char * text ) {
 
-   int st = -1;
-
-   if ( -1 == st ) {
-      throw std::runtime_error( "Socket::Write( char * )" );
-   }
-
-   return st;
+   return this->Write( (const void *) text, strlen( text ) );
 
 }
 
