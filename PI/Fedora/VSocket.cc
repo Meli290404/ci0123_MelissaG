@@ -81,10 +81,16 @@ VSocket::~VSocket() {
   *
  **/
 void VSocket::Close(){
-   int st = -1;
 
-   if ( -1 == st ) {
+   if (this->sockId != -1) {
+      int st = close( this->sockId );
+      
+      if ( -1 == st ) {
       throw std::runtime_error( "VSocket::Close()" );
+   }
+
+   this->sockId = -1;
+
    }
 
 }
@@ -100,12 +106,52 @@ void VSocket::Close(){
  **/
 int VSocket::TryToConnect( const char * hostip, int port ) {
 
+   
    int st = -1;
 
-   if ( -1 == st ) {
-      throw std::runtime_error( "VSocket::TryToConnect" );
+   if ( !IPv6 ) {
+
+      struct sockaddr_in host4;
+      memset( (char *) &host4, 0, sizeof( host4 ) );
+      host4.sin_family = AF_INET;
+
+      st = inet_pton( AF_INET, hostip, &host4.sin_addr );
+      if ( 1 != st ) {
+         throw std::runtime_error( "VSocket::TryToConnect, inet_pton: direccion IPv4 invalida" );
+      }
+
+      host4.sin_port = htons( (uint16_t) port );
+
+      st = connect( sockId, (sockaddr *) &host4, sizeof( host4 ) );
+      if ( -1 == st ) {
+         throw std::runtime_error( std::string( "VSocket::TryToConnect, connect: " ) + strerror( errno ) );
+      }
+
+   } else {
+
+      struct sockaddr_in6 host6;
+      memset( (char *) &host6, 0, sizeof( host6 ) );
+      host6.sin6_family = AF_INET6;
+
+      // NOTA: inet_pton no entiende el sufijo "%interfaz" de las direcciones
+      // link-local (fe80::...%eno1). Para esas direcciones usar la version
+      // TryToConnect( host, service ), que si lo soporta via getaddrinfo.
+      st = inet_pton( AF_INET6, hostip, &host6.sin6_addr );
+      if ( 1 != st ) {
+         throw std::runtime_error( "VSocket::TryToConnect, inet_pton: direccion IPv6 invalida "
+                                    "(si es link-local con %interfaz use TryToConnect(host, service))" );
+      }
+
+      host6.sin6_port = htons( (uint16_t) port );
+
+      st = connect( sockId, (sockaddr *) &host6, sizeof( host6 ) );
+      if ( -1 == st ) {
+         throw std::runtime_error( std::string( "VSocket::TryToConnect, connect: " ) + strerror( errno ) );
+      }
+
    }
 
+   this->port = port;
    return st;
 
 }
