@@ -21,7 +21,7 @@
 
 int main( int argc, char * argv[] ) {
    const char * lab = "fe80::8f5a:e2e1:7256:ffe3%enp0s31f6";
-   const char * alimentos = (char *) "GET /TicAmazon/list.php?category=Alimentos%20y%20bebidas HTTP/1.1\r\nhost: redes.ecci\r\n\r\n";
+   const char * alimentos = (char *) "GET /TicAmazon/list.php?category=Alimentos%20y%20bebidas\r\nHTTP/v1.1\r\nhost: redes.ecci\r\n\r\n";
 
    Socket s( 's', true );
    char a[512];
