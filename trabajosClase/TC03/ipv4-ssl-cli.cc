@@ -40,6 +40,14 @@ int main( int argc, char * argv[] ) {
 
    memset( a, 0 , MAXBUF );
    client->Connect( os, port );
+/***
+   // Prueba explícita de que sí hubo cifrado (solo tiene sentido en modo SSL)
+if ( argc > 1 ) {
+   SSLSocket * secure = (SSLSocket *) client;
+   printf( "Cipher usado: %s\n", secure->GetCipher() );
+   secure->ShowCerts();
+}
+*/
    client->Write(  (char * ) orchid, strlen( orchid ) );
    st = client->Read( a, MAXBUF );
    printf( "Bytes read %d\n%s\n", st, a);
