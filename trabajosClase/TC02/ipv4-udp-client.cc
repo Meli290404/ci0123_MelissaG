@@ -41,7 +41,7 @@ int main() {
    
    other.sin_family = AF_INET; 
    other.sin_port = htons( PORT ); 
-   n = inet_pton( AF_INET, "127.0.0.1", &other.sin_addr );	// IP address to test our client with a Python server on lab 3-5
+   n = inet_pton( AF_INET, "127.0.0.1", &other.sin_addr );	// IP para probar el client en localhost, IP para lab 10.1.35.50
    if ( 1 != n ) {
       printf( "Error converting from IP address\n" );
       exit( 23 );
