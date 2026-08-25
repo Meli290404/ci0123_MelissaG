@@ -23,7 +23,7 @@
 #include "SSLSocket.h"
 
 int main( int argc, char * argv[] ) {
-   const char * ipv6 = "fe80::8f5a:e2e1:7256:ffe3%enp0s31f6";
+   const char * ipv6 = "fe80::8f5a:e2e1:7256:ffe3%wlp3s0";
    const char * ipv4 = "10.1.35.1";
    const char * request = "GET /TicAmazon/list.php?category=Alimentos%20y%20bebidas HTTP/1.1\r\nhost: redes.ecci\r\n\r\n";
    VSocket * client;
