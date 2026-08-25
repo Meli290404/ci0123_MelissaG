@@ -28,7 +28,7 @@ int main( int argc, char * argv[] ) {
    const char * request = "GET /TicAmazon/list.php?category=Alimentos%20y%20bebidas HTTP/1.1\r\nhost: redes.ecci\r\n\r\n";
    VSocket * client;
    char a[512];
-   int ipVer = 4;	// 4 = IPv4, 6 = IPv6
+   int ipVer = 6;	// 4 = IPv4, 6 = IPv6
    int ssl = 0;		// 0 = non SSL, 1 = SSL
 
    memset( a, 0, 512 );	// Only first data part, must iterate to complete requested figure
