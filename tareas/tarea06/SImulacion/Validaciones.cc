@@ -10,3 +10,8 @@ bool validarProducto( const std::string & valor ) {
     static const std::regex patron( "^[a-zA-Z0-9\\-]{1,50}$" );
     return std::regex_match( valor, patron );
 }
+
+bool validarCount( const std::string & valor ) {
+    static const std::regex patron( "^[0-9]{1,3}$" );
+    return std::regex_match( valor, patron );
+}
