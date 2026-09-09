@@ -37,4 +37,12 @@ struct Producto {
     std::string descripcion;
 };
 
+// Item ya confirmado en el carrito via ADD_CART: precio y stock
+// ya fueron validados contra la bodega en el momento de agregarlo.
+struct ItemCarrito {
+    std::string nombre;
+    float precio;
+    int cantidad;
+};
+
 #endif
