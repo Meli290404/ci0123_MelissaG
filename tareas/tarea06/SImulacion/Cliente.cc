@@ -35,6 +35,15 @@ void Cliente::ejecutar() {
         "RE_PROD torta#3",      // ERR_FORMAT: caracter invalido
         "RE_PROD flan-de-coco",// formato valido, pero no existe en bodega
         "RE_PROD silenciar"     // Bodega no responde -> ERR_COMM
+
+        // casos de prueba factura y carrito
+        "GET_FACT 0",                     // carrito vacio antes de agregar nada
+        "ADD_CART capuchino 3",           // agrega producto valido
+        "ADD_CART menta 5",               // agrega otro producto
+        "ADD_CART tarta 999",             // ERR_STOCK: pide mas de lo que hay (stock 10)
+        "ADD_CART torta#3 2",             // ERR_FORMAT: nombre no cumple regex
+        "ADD_CART flan abc",              // ERR_FORMAT: count no cumple regex
+        "GET_FACT 2 capuchino,3;menta,5"  // cierra el pedido con lo confirmado antes
     };
 
     for ( const auto & peticion : peticiones ) {
