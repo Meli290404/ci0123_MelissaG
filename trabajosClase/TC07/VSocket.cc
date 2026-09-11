@@ -61,11 +61,17 @@ void VSocket::Init( char t, bool IPv6 ){
 
 void VSocket::Init( int id  ){
 
-   int st = -1;
-
-   if ( -1 == st ) {
-      throw std::runtime_error( "VSocket::Init, (reason)" );
+   // si accept() fallo en algun punto anterior, no deberiamos ni llegar aca pero por si acaso se valida.
+   if ( -1 == id ) {
+      throw std::runtime_error( "VSocket::Init(int), descriptor invalido" );
    }
+
+   this->sockId = id;
+
+   // como el socket ya viene "hecho" de afuera, asumimos que es un socket stream (TCP) IPv4, que es el unico caso que maneja este proyecto.
+   this->IPv6 = false;
+   this->port = 0;
+   this->type = 's';
 
 }
 
