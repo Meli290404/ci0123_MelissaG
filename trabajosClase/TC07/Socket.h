@@ -19,6 +19,7 @@ class Socket : public VSocket {
 
    public:
       Socket( char, bool = false );
+      Socket( int );  //constructor "desde descriptor existente": lo usa AcceptConnection() para envolver el nuevo socket que devuelve accept()
       ~Socket();
       int Connect( const char *, int );
       int Connect( const char *, const char * );

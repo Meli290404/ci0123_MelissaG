@@ -1,17 +1,15 @@
-
-# Linux Makefile
-#
-
 CC  := gcc
 CXX := g++
 CFLAGS := -g -c
 CXXFLAGS := -g -c -std=c++11
-LDFLAGS := 
+LDFLAGS :=
 DEPS := Socket.h
 TARGETS := ForkMirrorServer.out MirrorClient.out ThreadMirrorServer.out
 
-ALL := $(TARGETS)
 $(info $$TARGETS = $(TARGETS))
+
+.PHONY: all clean
+all: $(TARGETS)
 
 %.o: %.cc $(DEPS)
 	$(CXX) $(CXXFLAGS) $<
@@ -20,11 +18,10 @@ $(info $$TARGETS = $(TARGETS))
 	$(info $$^ = $^)
 	$(CXX) $^ $(LDFLAGS) -o $@
 
-ForkMirrorServer.out:	ForkMirrorServer.o VSocket.o Socket.o 
+ForkMirrorServer.out:   ForkMirrorServer.o VSocket.o Socket.o
 	$(CXX) ForkMirrorServer.o VSocket.o Socket.o $(LDFLAGS) -o $@
-	
-ThreadMirrorServer.out:	ThreadMirrorServer.o VSocket.o Socket.o 
-	$(CXX) ThreadMirrorServer.o VSocket.o Socket.o $(LDFLAGS) -o $@
-	
+ThreadMirrorServer.out: ThreadMirrorServer.o VSocket.o Socket.o
+	$(CXX) ThreadMirrorServer.o VSocket.o Socket.o -lpthread $(LDFLAGS) -o $@
+
 clean:
 	rm -f *.o *.out

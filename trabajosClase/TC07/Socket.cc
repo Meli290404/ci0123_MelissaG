@@ -36,6 +36,12 @@ Socket::Socket( char t, bool IPv6 ){
 
 }
 
+Socket::Socket( int id ) {
+
+   this->Init( id );      // Call base class Init(int), que solo adopta el descriptor
+
+}
+
 
 /**
   *  Class destructor

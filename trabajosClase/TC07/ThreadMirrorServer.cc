@@ -12,6 +12,7 @@
  
 #include <iostream>
 #include <thread>
+#include <cstring>       // memset
 
 #include "Socket.h"
 
@@ -27,6 +28,7 @@
  **/
 void task( VSocket * client ) {
    char a[ BUFSIZE ];
+   memset( a, 0, BUFSIZE ); // limpiar el buffer antes de leer, si no queda basura de memoria
 
    client->Read( a, BUFSIZE );	// Read a string from client, data will be limited by BUFSIZE bytes
    std::cout << "Server received: " << a << std::endl;

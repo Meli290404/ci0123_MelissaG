@@ -16,6 +16,7 @@
 #include <sys/types.h>
 #include <string.h>	// memset
 #include <unistd.h>
+#include <iostream>
 
 #include "Socket.h"
 
@@ -42,6 +43,7 @@ int main( int argc, char ** argv ) {
             s1->Close();			// Close original socket "s1" in child
             memset( a, 0, BUFSIZE );
             s2->Read( a, BUFSIZE );	// Read a string from client using new conection info
+            std::cout << "Server (child pid " << getpid() << ") received: " << a << std::endl;
             s2->Write( a );		// Write it back to client, this is the mirror function
             exit( 0 );			// Exit, finish child work
          }
