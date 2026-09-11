@@ -235,9 +235,11 @@ int VSocket::Bind( int port ) {
   *
  **/
 int VSocket::MarkPassive( int backlog ) {
-   int st = -1;
+   int st = listen( this->sockId, backlog );
 
-   throw std::runtime_error( "VSocket::MarkPassive" );
+   if ( -1 == st ) {
+      throw std::runtime_error( "VSocket::MarkPassive" );
+   }
 
    return st;
 
@@ -252,9 +254,13 @@ int VSocket::MarkPassive( int backlog ) {
   *
  **/
 int VSocket::WaitForConnection( void ) {
-   int st = -1;
+   // pasamos NULL, NULL porque en este proyecto no interesa guardar
+   // la direccion/puerto del cliente que se conecto, solo el descriptor nuevo
+   int st = accept( this->sockId, NULL, NULL );
 
-   throw std::runtime_error( "VSocket::WaitForConnection" );
+   if ( -1 == st ) {
+      throw std::runtime_error( "VSocket::WaitForConnection" );
+   }
 
    return st;
 
@@ -269,9 +275,11 @@ int VSocket::WaitForConnection( void ) {
   *
  **/
 int VSocket::Shutdown( int mode ) {
-   int st = -1;
+   int st = shutdown( this->sockId, mode );
 
-   throw std::runtime_error( "VSocket::Shutdown" );
+   if ( -1 == st ) {
+      throw std::runtime_error( "VSocket::Shutdown" );
+   }
 
    return st;
 
