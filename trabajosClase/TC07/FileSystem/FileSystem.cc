@@ -48,6 +48,10 @@ void Filesystem::liberarBloque(int numBloque) {
     bitmap_.liberarBloque(numBloque);
 }
 
+int Filesystem::bloquesLibres() {
+    return bitmap_.bloquesLibres();
+}
+
 void Filesystem::crearArchivo(const std::string& nombreNegocio) {
     std::ofstream nuevo(ruta_, std::ios::out | std::ios::binary);
 

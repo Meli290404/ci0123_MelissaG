@@ -24,6 +24,7 @@ public:
 
     int pedirBloque();
     void liberarBloque(int numBloque);
+    int bloquesLibres();
 
     // directorio de bodegas, con crecimiento por punteros
     uint16_t registrarBodega(const std::string& nombre, const std::string& id);
