@@ -2,3 +2,16 @@
 *.out
 *.exe
 *.o
+
+# certificado y llave privada 
+*.pem
+
+# logs que uses para debug (ej. redirigiendo la salida del servidor)
+*.log
+
+# core dumps, por si algun servidor crashea 
+core
+
+# archivos de respaldo que dejan algunos editores (vim, emacs, etc.)
+*~
+*.swp
