@@ -11,7 +11,23 @@ Filesystem::~Filesystem() {
 }
 
 void Filesystem::abrir() {
+    // si ya estaba abierto, open() fallaria y dejaria el failbit encendido
+    if (archivo_.is_open()) archivo_.close();
+    archivo_.clear();
     archivo_.open(ruta_, std::ios::in | std::ios::out | std::ios::binary);
+}
+
+bool Filesystem::archivoValido() {
+    if (!archivo_.is_open()) return false;
+
+    Superbloque sb{};
+    archivo_.clear();
+    leerSuperbloque(sb);
+    if (!archivo_) {
+        archivo_.clear();
+        return false;
+    }
+    return std::memcmp(sb.firma, FIRMA_CAFETERIA, sizeof(sb.firma)) == 0;
 }
 
 std::mutex& Filesystem::mutex() {
@@ -53,6 +69,8 @@ int Filesystem::bloquesLibres() {
 }
 
 void Filesystem::crearArchivo(const std::string& nombreNegocio) {
+    // se cierra antes de que el ofstream trunque el mismo archivo
+    if (archivo_.is_open()) archivo_.close();
     std::ofstream nuevo(ruta_, std::ios::out | std::ios::binary);
 
     // bloque 0: superbloque. el directorio de bodegas arranca en el bloque 2

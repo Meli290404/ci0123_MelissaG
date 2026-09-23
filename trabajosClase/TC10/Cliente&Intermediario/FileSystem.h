@@ -18,6 +18,8 @@ public:
 
     void crearArchivo(const std::string& nombreNegocio);
 
+    bool archivoValido();
+
     // acceso generico a un bloque de 256 bytes
     void leerBloque(int numBloque, void* destino);
     void escribirBloque(int numBloque, const void* origen);

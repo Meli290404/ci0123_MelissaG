@@ -41,6 +41,7 @@ void VSocket::Init( char t, bool IPv6 ){
    //guardar en el objeto que type de socket es y si es IPv6
    this->IPv6 = IPv6;
    this->port = 0; //sin puerto asociado
+   this->type = t;   // TryToConnect(host, service) usa type para elegir SOCK_STREAM o SOCK_DGRAM
 
    //dominio para socket ipv4 o ipv6
    int domain = this->IPv6 ? AF_INET6 : AF_INET;
@@ -222,6 +223,42 @@ int VSocket::Bind( int port ) {
       throw std::runtime_error( "VSocket::Bind" );
    }
 
+   return 0;
+}
+
+/**
+  * Bind method
+  *    bind a una direccion ip especifica en lugar de INADDR_ANY
+  *
+  * @param      const char * hostip: ip asignada en el laboratorio 3-5
+  * @param      int port: puerto del servicio
+  *
+ **/
+int VSocket::Bind( const char * hostip, int port ) {
+   struct sockaddr_in host4;
+   memset( &host4, 0, sizeof( host4 ) );
+   host4.sin_family = AF_INET;
+   host4.sin_port = htons( port );
+
+   if ( inet_pton( AF_INET, hostip, &host4.sin_addr ) <= 0 ) {
+      throw std::runtime_error( "VSocket::Bind, inet_pton" );
+   }
+
+   // se rechaza 127.x.x.x y 0.0.0.0 porque el servidor no puede atender por loopback
+   uint32_t ip = ntohl( host4.sin_addr.s_addr );
+   if ( ( ip >> 24 ) == 127 || ip == 0 ) {
+      throw std::runtime_error( "VSocket::Bind, no se permite loopback ni INADDR_ANY" );
+   }
+
+   // permite reiniciar el servidor sin esperar a que el puerto quede libre
+   int reusar = 1;
+   setsockopt( this->sockId, SOL_SOCKET, SO_REUSEADDR, &reusar, sizeof( reusar ) );
+
+   if ( -1 == bind( this->sockId, (struct sockaddr *) &host4, sizeof( host4 ) ) ) {
+      throw std::runtime_error( "VSocket::Bind" );
+   }
+
+   this->port = port;
    return 0;
 }
 

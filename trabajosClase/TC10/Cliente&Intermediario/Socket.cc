@@ -116,15 +116,20 @@ size_t Socket::Read( void * buffer, size_t size ) {
  **/
 size_t Socket::Write( const void * buffer, size_t size ) {
 
-   //enviar datos binarios por el socket
-   ssize_t st = write( this->sockId, buffer, size );
+   const char * datos = (const char *) buffer;
+   size_t enviados = 0;
 
-   if ( -1 == st ) {
-      perror( "write failed" );
-      throw std::runtime_error( "Socket::Write failed" );
+   // write puede enviar menos bytes de los pedidos, se repite hasta mandar todo
+   while ( enviados < size ) {
+      ssize_t st = write( this->sockId, datos + enviados, size - enviados );
+      if ( -1 == st ) {
+         perror( "write failed" );
+         throw std::runtime_error( "Socket::Write failed" );
+      }
+      enviados += st;
    }
 
-   return st;
+   return enviados;
 
 }
 
