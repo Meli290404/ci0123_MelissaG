@@ -57,3 +57,30 @@ std::string extraerCuerpo(const std::string& resp) {
     if (pos == std::string::npos) return resp;
     return resp.substr(pos + 4);
 }
+
+// devuelve la ruta pedida sin los parametros, por ejemplo "/" o "/tic"
+std::string extraerRuta(const std::string& peticion) {
+    size_t inicio = peticion.find(' ');
+    if (inicio == std::string::npos) return "";
+    size_t fin = peticion.find(' ', inicio + 1);
+    if (fin == std::string::npos) return "";
+
+    std::string url = peticion.substr(inicio + 1, fin - inicio - 1);
+    size_t signo = url.find('?');
+    return (signo == std::string::npos) ? url : url.substr(0, signo);
+}
+
+std::string construirRespuestaHttp(int codigo, const std::string& cuerpo) {
+    const char* texto = "Bad Request";
+    if (codigo == 200) texto = "OK";
+    else if (codigo == 404) texto = "Not Found";
+    else if (codigo == 405) texto = "Method Not Allowed";
+
+    std::ostringstream oss;
+    oss << "HTTP/1.1 " << codigo << " " << texto << "\r\n"
+        << "Content-Type: text/html; charset=utf-8\r\n"
+        << "Content-Length: " << cuerpo.size() << "\r\n"
+        << "Connection: close\r\n\r\n"
+        << cuerpo;
+    return oss.str();
+}
