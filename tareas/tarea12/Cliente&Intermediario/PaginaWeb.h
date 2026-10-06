@@ -11,11 +11,15 @@ public:
     std::string inventario(const std::vector<BodegaVista>& bodegas);
     std::string error(int codigo, const std::string& mensaje);
 
+    // pagina completa con encabezado alrededor de un contenido ya armado
+    std::string envolver(const std::string& titulo, const std::string& contenido);
+
+    // evita que un texto se interprete como etiquetas dentro de la pagina
+    std::string escapar(const std::string& texto);
+
 private:
     std::string seccionBodega(const BodegaVista& bodega);
     std::string tablaProductos(const CategoriaVista& categoria);
-    std::string envolver(const std::string& titulo, const std::string& contenido);
-    std::string escapar(const std::string& texto);
 };
 
 #endif

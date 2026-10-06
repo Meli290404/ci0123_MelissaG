@@ -33,7 +33,7 @@ std::string PaginaWeb::seccionBodega(const BodegaVista& bodega) {
         << " <small>(" << escapar(bodega.id) << ")</small></h2>\n";
 
     if (bodega.categorias.empty()) {
-        oss << "<p>Esta bodega no tiene categorías.</p>\n";
+        oss << "<p>No hay categorías.</p>\n";
     }
     for (const auto& categoria : bodega.categorias) {
         // el id se muestra porque es lo que se escribe en el cliente de terminal
@@ -75,7 +75,6 @@ std::string PaginaWeb::envolver(const std::string& titulo, const std::string& co
     return oss.str();
 }
 
-// evita que un texto guardado se interprete como etiquetas dentro de la pagina
 std::string PaginaWeb::escapar(const std::string& texto) {
     std::string r;
     for (char c : texto) {
