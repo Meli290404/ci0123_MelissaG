@@ -13,7 +13,9 @@
 
 #ifndef VSocket_h
 #define VSocket_h
- 
+
+#include <cstddef>
+
 class VSocket {
    public:
       void Init( char, bool = false );
@@ -32,10 +34,11 @@ class VSocket {
 
       int Bind( int );                    // Assign a socket address to a socket descriptor
       int Bind( const char *, int );      // bind a una ip especifica, rechaza loopback
-      int MarkPassive( int );		      // Mark a socket passive: will be used to accept connections
-      int WaitForConnection( void );	// Wait for a peer connection
+      int MarkPassive( int );          // Mark a socket passive: will be used to accept connections
+      int WaitForConnection( void );   // Wait for a peer connection
       virtual VSocket * AcceptConnection() = 0;
-      int Shutdown( int );		     // cause all or part of a full-duplex connection on the socket
+      int SetTimeout( int );       // tiempo maximo de espera para connect, read y write
+      int Shutdown( int );         // cause all or part of a full-duplex connection on the socket
                                          // associated with the file descriptor socket to be shut down
 
 // UDP methods
@@ -47,7 +50,6 @@ class VSocket {
       bool IPv6;      // Is IPv6 socket?
       int port;       // Socket associated port
       char type;      // Socket type (datagram, stream, etc.)
-        
 };
 
 #endif // VSocket_h

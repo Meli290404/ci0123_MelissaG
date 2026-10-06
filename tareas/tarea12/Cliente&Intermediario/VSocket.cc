@@ -18,6 +18,7 @@
 #include <netdb.h>		// getaddrinfo, freeaddrinfo
 #include <unistd.h>		// close
 #include <iostream>
+#include <sys/time.h>	// timeval
 /*
 #include <cstddef>
 #include <cstdio>
@@ -373,4 +374,26 @@ size_t VSocket::recvFrom( void * buffer, size_t size, void * addr ) {
 
    return static_cast<size_t>(received_bytes); //turn y return el # de bytes enviados
 
+}
+
+
+/**
+  * SetTimeout method
+  *    use "setsockopt" Unix system call con SO_RCVTIMEO y SO_SNDTIMEO
+  *
+  * @param      int segundos: tiempo maximo que esperan connect, read y write antes de fallar
+  *
+ **/
+int VSocket::SetTimeout( int segundos ) {
+   struct timeval espera;
+   espera.tv_sec = segundos;
+   espera.tv_usec = 0;
+
+   // sin esto un read se queda esperando para siempre si el otro lado no responde
+   if ( -1 == setsockopt( this->sockId, SOL_SOCKET, SO_RCVTIMEO, &espera, sizeof( espera ) ) ||
+        -1 == setsockopt( this->sockId, SOL_SOCKET, SO_SNDTIMEO, &espera, sizeof( espera ) ) ) {
+      throw std::runtime_error( "VSocket::SetTimeout" );
+   }
+
+   return 0;
 }
