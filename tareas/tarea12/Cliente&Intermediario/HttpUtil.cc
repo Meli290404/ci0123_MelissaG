@@ -58,16 +58,35 @@ std::string extraerCuerpo(const std::string& resp) {
     return resp.substr(pos + 4);
 }
 
-// devuelve la ruta pedida sin los parametros, por ejemplo "/" o "/tic"
-std::string extraerRuta(const std::string& peticion) {
+// la direccion completa es lo que esta entre el primer y el segundo espacio: "GET /ruta?a=1 HTTP/1.1"
+static std::string extraerUrl(const std::string& peticion) {
     size_t inicio = peticion.find(' ');
     if (inicio == std::string::npos) return "";
     size_t fin = peticion.find(' ', inicio + 1);
     if (fin == std::string::npos) return "";
+    return peticion.substr(inicio + 1, fin - inicio - 1);
+}
 
-    std::string url = peticion.substr(inicio + 1, fin - inicio - 1);
+std::string extraerRuta(const std::string& peticion) {
+    std::string url = extraerUrl(peticion);
     size_t signo = url.find('?');
     return (signo == std::string::npos) ? url : url.substr(0, signo);
+}
+
+std::string parametroUrl(const std::string& peticion, const std::string& nombre) {
+    std::string url = extraerUrl(peticion);
+    size_t signo = url.find('?');
+    if (signo == std::string::npos) return "";
+
+    // los parametros van separados por '&', cada uno con la forma clave=valor
+    std::stringstream ss(url.substr(signo + 1));
+    std::string par;
+    while (std::getline(ss, par, '&')) {
+        size_t igual = par.find('=');
+        if (igual == std::string::npos) continue;
+        if (urlDecode(par.substr(0, igual)) == nombre) return urlDecode(par.substr(igual + 1));
+    }
+    return "";
 }
 
 std::string construirRespuestaHttp(int codigo, const std::string& cuerpo) {
@@ -75,6 +94,7 @@ std::string construirRespuestaHttp(int codigo, const std::string& cuerpo) {
     if (codigo == 200) texto = "OK";
     else if (codigo == 404) texto = "Not Found";
     else if (codigo == 405) texto = "Method Not Allowed";
+    else if (codigo == 502) texto = "Bad Gateway";
 
     std::ostringstream oss;
     oss << "HTTP/1.1 " << codigo << " " << texto << "\r\n"
