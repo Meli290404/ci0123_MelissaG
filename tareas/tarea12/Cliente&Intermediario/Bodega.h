@@ -7,6 +7,9 @@
 #include "Formatos.h"
 #include "FileSystem.h"
 
+// resultado de descontarStock
+enum ResultadoStock { STOCK_DESCONTADO, STOCK_INSUFICIENTE, PRODUCTO_NO_EXISTE };
+
 // representa una bodega dentro de cafeteria.dat. no tiene archivo propio:
 // todas las bodegas comparten el mismo Filesystem y el mismo bitmap.
 class Bodega {
@@ -23,6 +26,10 @@ public:
 
     // devuelve al bitmap todos los bloques de esta bodega: directorio de categorias, indices y datos
     void liberarContenido();
+
+        // busca el producto en esta bodega y, si alcanza, resta la cantidad y escribe el bloque.
+    // stockActual devuelve el stock nuevo si se desconto, o el disponible si no alcanzo
+    ResultadoStock descontarStock(const std::string& nombre, int cantidad, int& stockActual);
 
 private:
     Filesystem& fs_;

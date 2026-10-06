@@ -23,6 +23,8 @@ public:
 
     // recorre todo el archivo y arma las vistas que usa PaginaWeb
     std::vector<BodegaVista> leerInventario();
+    // descuenta del producto en la bodega donde este; stockActual queda como en Bodega::descontarStock
+    bool descontarStock(const std::string& nombre, int cantidad, int& stockActual, std::string& error);
 
 private:
     Filesystem& fs_;

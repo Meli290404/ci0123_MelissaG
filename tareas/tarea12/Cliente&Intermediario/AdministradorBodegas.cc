@@ -203,3 +203,27 @@ bool AdministradorBodegas::productoExiste(const std::string& nombre) {
     }
     return false;
 }
+
+bool AdministradorBodegas::descontarStock(const std::string& nombre, int cantidad, int& stockActual,
+                                          std::string& error) {
+    if (cantidad <= 0) {
+        error = "la cantidad a descontar debe ser mayor que 0";
+        return false;
+    }
+
+    // los nombres de producto no se repiten entre bodegas, asi que solo una bodega lo puede tener
+    for (auto& dirBod : fs_.listarBodegas()) {
+        Bodega bodega(fs_, dirBod.bloqueDirCategorias);
+        ResultadoStock resultado = bodega.descontarStock(nombre, cantidad, stockActual);
+
+        if (resultado == STOCK_DESCONTADO) return true;
+        if (resultado == STOCK_INSUFICIENTE) {
+            error = "stock insuficiente de " + nombre + ": hay " + std::to_string(stockActual);
+            return false;
+        }
+        // PRODUCTO_NO_EXISTE en esta bodega: se sigue con la siguiente
+    }
+
+    error = "no existe un producto llamado " + nombre;
+    return false;
+}

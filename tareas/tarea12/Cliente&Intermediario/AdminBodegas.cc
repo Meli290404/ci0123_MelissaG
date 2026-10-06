@@ -14,7 +14,8 @@ static void mostrarUso(const char* programa) {
               << "  " << programa << " <archivo> agregar <idBodega> <nombre>\n"
               << "  " << programa << " <archivo> eliminar <idBodega>\n"
               << "  " << programa << " <archivo> categoria <idBodega> <idCategoria> <nombre>\n"
-              << "  " << programa << " <archivo> producto <idBodega> <idCategoria> <nombre> <cantidad> <precioCentavos>\n";
+              << "  " << programa << " <archivo> producto <idBodega> <idCategoria> <nombre> <cantidad> <precioCentavos>\n"
+              << "  " << programa << " <archivo> descontar <producto> <cantidad>\n";
 }
 
 static bool esNumero(const std::string& texto) {
@@ -93,6 +94,15 @@ int main(int argc, char* argv[]) {
         } else {
             ok = admin.agregarProducto(argv[3], argv[4], argv[5], std::stoi(argv[6]),
                                        (uint32_t)std::stoul(argv[7]), error);
+        }
+    } else if (comando == "descontar" && argc == 5) {
+        if (!esNumero(argv[4])) {
+            ok = false;
+            error = "la cantidad debe ser un numero entero";
+        } else {
+            int stockActual = 0;
+            ok = admin.descontarStock(argv[3], std::stoi(argv[4]), stockActual, error);
+            if (ok) std::cout << "quedan " << stockActual << "\n";
         }
     } else {
         mostrarUso(argv[0]);

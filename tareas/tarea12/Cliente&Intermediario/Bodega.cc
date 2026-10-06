@@ -222,3 +222,41 @@ void Bodega::liberarContenido() {
         bloqueActual = siguiente;
     }
 }
+
+ResultadoStock Bodega::descontarStock(const std::string& nombre, int cantidad, int& stockActual) {
+    // un solo candado para que ningun otro hilo cambie el stock entre la revision y la escritura
+    std::lock_guard<std::mutex> lock(fs_.mutex());
+
+    int bloqueActual = bloqueDirCategorias_;
+    while (bloqueActual != BLOQUE_NULO) {
+        BloqueDirCategorias dir;
+        fs_.leerBloque(bloqueActual, &dir);
+
+        for (int i = 0; i < CASILLAS_POR_BLOQUE_DIR; i++) {
+            if (dir.casillas[i].estado != 1) continue;
+
+            BloqueIndice indice;
+            fs_.leerBloque(dir.casillas[i].bloqueIndice, &indice);
+
+            for (int b = 0; b < indice.cantidadBloques; b++) {
+                RegistroProducto datos[PRODUCTOS_POR_BLOQUE];
+                fs_.leerBloque(indice.bloquesDatos[b], datos);
+
+                for (int p = 0; p < PRODUCTOS_POR_BLOQUE; p++) {
+                    if (datos[p].estado != 1) continue;
+                    if (nombre != std::string(datos[p].nombre, strnlen(datos[p].nombre, sizeof(datos[p].nombre)))) continue;
+
+                    stockActual = datos[p].cantidad;
+                    if (stockActual < cantidad) return STOCK_INSUFICIENTE;
+
+                    datos[p].cantidad -= cantidad;
+                    stockActual = datos[p].cantidad;
+                    fs_.escribirBloque(indice.bloquesDatos[b], datos);
+                    return STOCK_DESCONTADO;
+                }
+            }
+        }
+        bloqueActual = dir.encabezado.siguienteBloque;
+    }
+    return PRODUCTO_NO_EXISTE;
+}
