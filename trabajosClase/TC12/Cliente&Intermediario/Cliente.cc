@@ -7,7 +7,7 @@
 #include "Protocolo.h"
 #include "HttpUtil.h"
 
-static const char* HOST_SERVIDOR = "127.0.0.1"; // cambiar por la IP del intermediario en la isla
+static std::string hostServidor;   // se recibe por argumento, el servidor no atiende por 127.0.0.1
 static const int PUERTO_SERVIDOR = 8080;
 static const std::string MI_ID = "CLI_04";
 static const std::string ID_INTERMEDIARIO = "INT_04";
@@ -29,11 +29,10 @@ std::string enviarMensaje(const std::string& mensajeProtocolo) {
     VSocket* cliente = nullptr;
     try {
         cliente = new Socket('s');
-        if (cliente->Connect(HOST_SERVIDOR, PUERTO_SERVIDOR) != 0) throw std::runtime_error("Connect fallo");
+        if (cliente->Connect(hostServidor.c_str(), PUERTO_SERVIDOR) != 0) throw std::runtime_error("Connect fallo");
 
         std::string ruta = "/tic?msg=" + urlEncode(mensajeProtocolo);
-        cliente->Write(buildGET(ruta, HOST_SERVIDOR).c_str());
-
+        cliente->Write(buildGET(ruta, hostServidor).c_str());
         std::string respuesta = leerTodo(cliente);
         delete cliente;
 
@@ -160,7 +159,13 @@ void comandoFactura() {
     carrito.clear();
 }
 
-int main() {
+int main(int argc, char* argv[]) {
+    if (argc < 2) {
+        std::cerr << "uso: " << argv[0] << " <ip del servidor>\n";
+        return 1;
+    }
+    hostServidor = argv[1];
+
     std::cout << "---TicAmazon Cliente---\n";
     std::cout << "Comandos: CATEGORIAS | <idCategoria> | PRODUCTO <nombre> | "
                  "AGREGAR <nombre> <cantidad> | FACTURA | salir\n";
