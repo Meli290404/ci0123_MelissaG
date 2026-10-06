@@ -18,6 +18,7 @@ public:
 
     void crearArchivo(const std::string& nombreNegocio);
 
+    // revisa si cafeteria.dat existe y trae la firma de FIRMA_CAFETERIA
     bool archivoValido();
 
     // acceso generico a un bloque de 256 bytes
@@ -32,6 +33,7 @@ public:
     uint16_t registrarBodega(const std::string& nombre, const std::string& id);
     bool buscarBodega(const std::string& id, DirBodega& resultado);
     std::vector<DirBodega> listarBodegas();
+
     // marca libre la casilla de la bodega y devuelve sus datos para liberar sus bloques despues
     bool quitarBodega(const std::string& id, DirBodega& quitada);
 

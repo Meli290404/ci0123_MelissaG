@@ -2,18 +2,15 @@ CXX = g++
 CXXFLAGS = -std=c++17 -Wall -pthread
 
 COMUNES = FileSystem.cc Bitmap.cc Bodega.cc AdministradorBodegas.cc Validaciones.cc
-RED = VSocket.cc Socket.cc HttpUtil.cc Protocolo.cc
+RED = VSocket.cc Socket.cc
 
-all: servidor adminBodegas cliente
+all: servidorProductos adminBodegas
 
-servidor: Intermediario.cc Despachador.cc PaginaWeb.cc $(RED) $(COMUNES)
-	$(CXX) $(CXXFLAGS) $^ -o servidor
+servidorProductos: ServidorProductos.cc AtencionBodega.cc Protocolo.cc $(RED) $(COMUNES)
+	$(CXX) $(CXXFLAGS) $^ -o servidorProductos
 
 adminBodegas: AdminBodegas.cc $(COMUNES)
 	$(CXX) $(CXXFLAGS) $^ -o adminBodegas
 
-cliente: Cliente.cc $(RED)
-	$(CXX) $(CXXFLAGS) $^ -o cliente
-
 clean:
-	rm -f servidor adminBodegas cliente
+	rm -f servidorProductos adminBodegas

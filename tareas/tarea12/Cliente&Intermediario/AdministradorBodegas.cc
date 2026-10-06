@@ -74,8 +74,9 @@ bool AdministradorBodegas::eliminarBodega(const std::string& id, std::string& er
 
 bool AdministradorBodegas::agregarCategoria(const std::string& idBodega, const std::string& idCategoria,
                                             const std::string& nombre, std::string& error) {
-    if (!cabeEnCampo(idCategoria, sizeof(DirCategoria::id)) || !validarCategoria(idCategoria + "xxx")) {
-        error = "el id de categoria debe tener entre 1 y " + std::to_string(sizeof(DirCategoria::id) - 1) +
+    // el id debe cumplir validarCategoria (al menos 3 letras) y caber en DirCategoria::id
+    if (!cabeEnCampo(idCategoria, sizeof(DirCategoria::id)) || !validarCategoria(idCategoria)) {
+        error = "el id de categoria debe tener entre 3 y " + std::to_string(sizeof(DirCategoria::id) - 1) +
                 " letras";
         return false;
     }
@@ -91,7 +92,7 @@ bool AdministradorBodegas::agregarCategoria(const std::string& idBodega, const s
         return false;
     }
 
-    // se revisa en todas las bodegas porque el despachador encuentra categorias solo por id
+    // se revisa en todas las bodegas porque las categorias se buscan solo por id
     if (categoriaExiste(idCategoria)) {
         error = "ya existe una categoria con id " + idCategoria;
         return false;
@@ -135,7 +136,7 @@ bool AdministradorBodegas::agregarProducto(const std::string& idBodega, const st
         return false;
     }
 
-    // el despachador busca productos solo por nombre, por eso no se permiten repetidos
+    // los productos se buscan solo por nombre, por eso no se permiten repetidos
     if (productoExiste(nombre)) {
         error = "ya existe un producto llamado " + nombre;
         return false;
@@ -153,6 +154,30 @@ bool AdministradorBodegas::agregarProducto(const std::string& idBodega, const st
         return false;
     }
     return true;
+}
+
+bool AdministradorBodegas::descontarStock(const std::string& nombre, int cantidad, int& stockActual,
+                                          std::string& error) {
+    if (cantidad <= 0) {
+        error = "la cantidad a descontar debe ser mayor que 0";
+        return false;
+    }
+
+    // los nombres de producto no se repiten entre bodegas, asi que solo una bodega lo puede tener
+    for (auto& dirBod : fs_.listarBodegas()) {
+        Bodega bodega(fs_, dirBod.bloqueDirCategorias);
+        ResultadoStock resultado = bodega.descontarStock(nombre, cantidad, stockActual);
+
+        if (resultado == STOCK_DESCONTADO) return true;
+        if (resultado == STOCK_INSUFICIENTE) {
+            error = "stock insuficiente de " + nombre + ": hay " + std::to_string(stockActual);
+            return false;
+        }
+        // PRODUCTO_NO_EXISTE en esta bodega: se sigue con la siguiente
+    }
+
+    error = "no existe un producto llamado " + nombre;
+    return false;
 }
 
 std::vector<BodegaVista> AdministradorBodegas::leerInventario() {
@@ -183,6 +208,41 @@ std::vector<BodegaVista> AdministradorBodegas::leerInventario() {
     return inventario;
 }
 
+std::vector<std::string> AdministradorBodegas::listarIdsCategorias() {
+    std::vector<std::string> ids;
+    for (auto& dirBod : fs_.listarBodegas()) {
+        Bodega bodega(fs_, dirBod.bloqueDirCategorias);
+        for (auto& cat : bodega.listarCategorias()) {
+            ids.push_back(textoCampo(cat.id, sizeof(cat.id)));
+        }
+    }
+    return ids;
+}
+
+bool AdministradorBodegas::productosDeCategoria(const std::string& idCategoria,
+                                                std::vector<RegistroProducto>& productos) {
+    productos.clear();
+    for (auto& dirBod : fs_.listarBodegas()) {
+        Bodega bodega(fs_, dirBod.bloqueDirCategorias);
+        DirCategoria cat;
+        if (bodega.buscarCategoria(idCategoria, cat)) {
+            productos = bodega.listarProductos(idCategoria);
+            return true;
+        }
+    }
+    return false;
+}
+
+bool AdministradorBodegas::reservar(const std::string& nombre, int pedido, int& reservado,
+                                    uint32_t& precioCentavos) {
+    // los nombres de producto no se repiten entre bodegas, asi que solo una bodega lo puede tener
+    for (auto& dirBod : fs_.listarBodegas()) {
+        Bodega bodega(fs_, dirBod.bloqueDirCategorias);
+        if (bodega.reservarStock(nombre, pedido, reservado, precioCentavos)) return true;
+    }
+    return false;
+}
+
 bool AdministradorBodegas::categoriaExiste(const std::string& idCategoria) {
     for (auto& dirBod : fs_.listarBodegas()) {
         Bodega bodega(fs_, dirBod.bloqueDirCategorias);
@@ -201,29 +261,5 @@ bool AdministradorBodegas::productoExiste(const std::string& nombre) {
             }
         }
     }
-    return false;
-}
-
-bool AdministradorBodegas::descontarStock(const std::string& nombre, int cantidad, int& stockActual,
-                                          std::string& error) {
-    if (cantidad <= 0) {
-        error = "la cantidad a descontar debe ser mayor que 0";
-        return false;
-    }
-
-    // los nombres de producto no se repiten entre bodegas, asi que solo una bodega lo puede tener
-    for (auto& dirBod : fs_.listarBodegas()) {
-        Bodega bodega(fs_, dirBod.bloqueDirCategorias);
-        ResultadoStock resultado = bodega.descontarStock(nombre, cantidad, stockActual);
-
-        if (resultado == STOCK_DESCONTADO) return true;
-        if (resultado == STOCK_INSUFICIENTE) {
-            error = "stock insuficiente de " + nombre + ": hay " + std::to_string(stockActual);
-            return false;
-        }
-        // PRODUCTO_NO_EXISTE en esta bodega: se sigue con la siguiente
-    }
-
-    error = "no existe un producto llamado " + nombre;
     return false;
 }

@@ -195,7 +195,6 @@ std::vector<RegistroProducto> Bodega::listarProductos(const std::string& idCateg
     }
     return productos;
 }
-
 void Bodega::liberarContenido() {
     std::lock_guard<std::mutex> lock(fs_.mutex());
 
@@ -227,6 +226,43 @@ ResultadoStock Bodega::descontarStock(const std::string& nombre, int cantidad, i
     // un solo candado para que ningun otro hilo cambie el stock entre la revision y la escritura
     std::lock_guard<std::mutex> lock(fs_.mutex());
 
+    int bloque, pos;
+    if (!ubicarProducto(nombre, bloque, pos)) return PRODUCTO_NO_EXISTE;
+
+    RegistroProducto datos[PRODUCTOS_POR_BLOQUE];
+    fs_.leerBloque(bloque, datos);
+
+    stockActual = datos[pos].cantidad;
+    if (stockActual < cantidad) return STOCK_INSUFICIENTE;
+
+    datos[pos].cantidad -= cantidad;
+    stockActual = datos[pos].cantidad;
+    fs_.escribirBloque(bloque, datos);
+    return STOCK_DESCONTADO;
+}
+
+bool Bodega::reservarStock(const std::string& nombre, int pedido, int& reservado, uint32_t& precioCentavos) {
+    // un solo candado para que ningun otro hilo cambie el stock entre la revision y la escritura
+    std::lock_guard<std::mutex> lock(fs_.mutex());
+
+    int bloque, pos;
+    if (!ubicarProducto(nombre, bloque, pos)) return false;
+
+    RegistroProducto datos[PRODUCTOS_POR_BLOQUE];
+    fs_.leerBloque(bloque, datos);
+
+    // si no alcanza se reserva lo que haya disponible
+    reservado = (datos[pos].cantidad < pedido) ? datos[pos].cantidad : pedido;
+    precioCentavos = datos[pos].precioCentavos;
+
+    if (reservado > 0) {
+        datos[pos].cantidad -= reservado;
+        fs_.escribirBloque(bloque, datos);
+    }
+    return true;
+}
+
+bool Bodega::ubicarProducto(const std::string& nombre, int& bloqueOut, int& posOut) {
     int bloqueActual = bloqueDirCategorias_;
     while (bloqueActual != BLOQUE_NULO) {
         BloqueDirCategorias dir;
@@ -243,20 +279,16 @@ ResultadoStock Bodega::descontarStock(const std::string& nombre, int cantidad, i
                 fs_.leerBloque(indice.bloquesDatos[b], datos);
 
                 for (int p = 0; p < PRODUCTOS_POR_BLOQUE; p++) {
-                    if (datos[p].estado != 1) continue;
-                    if (nombre != std::string(datos[p].nombre, strnlen(datos[p].nombre, sizeof(datos[p].nombre)))) continue;
-
-                    stockActual = datos[p].cantidad;
-                    if (stockActual < cantidad) return STOCK_INSUFICIENTE;
-
-                    datos[p].cantidad -= cantidad;
-                    stockActual = datos[p].cantidad;
-                    fs_.escribirBloque(indice.bloquesDatos[b], datos);
-                    return STOCK_DESCONTADO;
+                    if (datos[p].estado == 1 &&
+                        nombre == std::string(datos[p].nombre, strnlen(datos[p].nombre, sizeof(datos[p].nombre)))) {
+                        bloqueOut = indice.bloquesDatos[b];
+                        posOut = p;
+                        return true;
+                    }
                 }
             }
         }
         bloqueActual = dir.encabezado.siguienteBloque;
     }
-    return PRODUCTO_NO_EXISTE;
+    return false;
 }

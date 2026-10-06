@@ -1,6 +1,7 @@
 #include "Protocolo.h"
 #include <sstream>
 #include <stdexcept>
+#include <cstdio>
 
 std::string construirMensaje(const std::string& origen, const std::string& destino,
                               int tipo, const std::vector<std::string>& campos) {
@@ -43,4 +44,10 @@ Mensaje parsearMensaje(const std::string& texto) {
     }
 
     return msg;
+}
+
+std::string precioATexto(uint32_t centavos) {
+    char buf[16];
+    snprintf(buf, sizeof(buf), "%u.%02u", centavos / 100, centavos % 100);
+    return buf;
 }

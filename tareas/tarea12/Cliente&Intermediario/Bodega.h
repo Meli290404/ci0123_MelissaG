@@ -27,15 +27,22 @@ public:
     // devuelve al bitmap todos los bloques de esta bodega: directorio de categorias, indices y datos
     void liberarContenido();
 
-        // busca el producto en esta bodega y, si alcanza, resta la cantidad y escribe el bloque.
+    // busca el producto en esta bodega y, si alcanza, resta la cantidad y escribe el bloque.
     // stockActual devuelve el stock nuevo si se desconto, o el disponible si no alcanzo
     ResultadoStock descontarStock(const std::string& nombre, int cantidad, int& stockActual);
+
+    // reserva hasta la cantidad pedida; si no alcanza reserva lo que haya.
+    // devuelve false si el producto no esta en esta bodega
+    bool reservarStock(const std::string& nombre, int pedido, int& reservado, uint32_t& precioCentavos);
 
 private:
     Filesystem& fs_;
     uint16_t bloqueDirCategorias_;
 
     bool ubicarCasillaCategoria(const std::string& id, int& bloqueOut, int& posOut);
+
+    // encuentra el bloque de datos y la posicion del producto; quien la llama ya debe tener el mutex
+    bool ubicarProducto(const std::string& nombre, int& bloqueOut, int& posOut);
 };
 
 #endif

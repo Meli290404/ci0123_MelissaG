@@ -2,6 +2,7 @@
 #include <string>
 #include <cctype>
 #include <cstdint>
+#include <vector>
 
 #include "FileSystem.h"
 #include "AdministradorBodegas.h"
