@@ -1,0 +1,177 @@
+! show running-config del switch 2960 de la isla 4 (VLAN 240), troncal por Gi0/1 hacia el L3
+! red de la isla 172.16.123.64/28: gateway .65 (svi del L3), switch .66, clientes dhcp .67 a .78
+! puertos Fa0/13 a Fa0/24 en la vlan 240 como en Packet Tracer; Fa0/1 a Fa0/12 apagados porque no se usan
+!
+!
+version 12.2
+no service pad
+service timestamps debug datetime msec
+service timestamps log datetime msec
+service password-encryption
+!
+hostname SW-G2-Equipo4
+!
+enable secret clase
+!
+boot-start-marker
+boot-end-marker
+!
+!
+!
+!
+no aaa new-model
+system mtu routing 1500
+! se excluyen el gateway (.65) y la ip de administracion del switch (.66)
+ip dhcp excluded-address 172.16.123.65 172.16.123.66
+!
+ip dhcp pool ISLA4
+   network 172.16.123.64 255.255.255.240
+   default-router 172.16.123.65
+!
+!
+no ip domain-lookup
+!
+!
+!
+!
+!
+!
+spanning-tree mode pvst
+spanning-tree extend system-id
+!
+vlan internal allocation policy ascending
+!
+! la vlan se guarda en vlan.dat y no aparece en show running-config;
+! se deja aqui para que el archivo sirva para configurar un switch reiniciado a fabrica
+vlan 240
+ name Isla4
+!
+!
+!
+interface FastEthernet0/1
+ shutdown
+!
+interface FastEthernet0/2
+ shutdown
+!
+interface FastEthernet0/3
+ shutdown
+!
+interface FastEthernet0/4
+ shutdown
+!
+interface FastEthernet0/5
+ shutdown
+!
+interface FastEthernet0/6
+ shutdown
+!
+interface FastEthernet0/7
+ shutdown
+!
+interface FastEthernet0/8
+ shutdown
+!
+interface FastEthernet0/9
+ shutdown
+!
+interface FastEthernet0/10
+ shutdown
+!
+interface FastEthernet0/11
+ shutdown
+!
+interface FastEthernet0/12
+ shutdown
+!
+interface FastEthernet0/13
+ switchport access vlan 240
+ switchport mode access
+ spanning-tree portfast
+!
+interface FastEthernet0/14
+ switchport access vlan 240
+ switchport mode access
+ spanning-tree portfast
+!
+interface FastEthernet0/15
+ switchport access vlan 240
+ switchport mode access
+ spanning-tree portfast
+!
+interface FastEthernet0/16
+ switchport access vlan 240
+ switchport mode access
+ spanning-tree portfast
+!
+interface FastEthernet0/17
+ switchport access vlan 240
+ switchport mode access
+ spanning-tree portfast
+!
+interface FastEthernet0/18
+ switchport access vlan 240
+ switchport mode access
+ spanning-tree portfast
+!
+interface FastEthernet0/19
+ switchport access vlan 240
+ switchport mode access
+ spanning-tree portfast
+!
+interface FastEthernet0/20
+ switchport access vlan 240
+ switchport mode access
+ spanning-tree portfast
+!
+interface FastEthernet0/21
+ switchport access vlan 240
+ switchport mode access
+ spanning-tree portfast
+!
+interface FastEthernet0/22
+ switchport access vlan 240
+ switchport mode access
+ spanning-tree portfast
+!
+interface FastEthernet0/23
+ switchport access vlan 240
+ switchport mode access
+ spanning-tree portfast
+!
+interface FastEthernet0/24
+ switchport access vlan 240
+ switchport mode access
+ spanning-tree portfast
+!
+interface GigabitEthernet0/1
+ switchport trunk allowed vlan 240
+ switchport mode trunk
+!
+interface GigabitEthernet0/2
+ shutdown
+!
+interface Vlan1
+ no ip address
+!
+interface Vlan240
+ ip address 172.16.123.66 255.255.255.240
+!
+ip default-gateway 172.16.123.65
+ip http server
+ip http secure-server
+vstack
+!
+banner motd ^C Switch isla 4 - acceso solo autorizado ^C
+!
+line con 0
+ password cisco
+ login
+line vty 0 4
+ password cisco
+ login
+line vty 5 15
+ password cisco
+ login
+!
+end
