@@ -27,8 +27,8 @@ public:
     // recorre todo el archivo y arma las vistas que usa PaginaWeb
     std::vector<BodegaVista> leerInventario();
 
-    // ids de todas las categorias de todas las bodegas
-    std::vector<std::string> listarIdsCategorias();
+    // id y nombre de todas las categorias de todas las bodegas
+    std::vector<std::pair<std::string, std::string>> listarCategorias();
 
     // productos de la categoria en la bodega donde este; devuelve false si ninguna la tiene
     bool productosDeCategoria(const std::string& idCategoria, std::vector<RegistroProducto>& productos);

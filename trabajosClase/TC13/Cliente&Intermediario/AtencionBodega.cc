@@ -49,11 +49,12 @@ std::string AtencionBodega::responder(const std::string& texto) {
     }
 }
 
+// lista con el formato id:nombre,id:nombre
 std::string AtencionBodega::listaCategorias(const std::string& destino) {
     std::string lista;
-    for (const auto& id : admin_.listarIdsCategorias()) {
+    for (const auto& categoria : admin_.listarCategorias()) {
         if (!lista.empty()) lista += ",";
-        lista += id;
+        lista += categoria.first + ":" + categoria.second;
     }
     return construirMensaje(ID_SERVIDOR, destino, TIPO_CATEGORY_LIST, {lista});
 }

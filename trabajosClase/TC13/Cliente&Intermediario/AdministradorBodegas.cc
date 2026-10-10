@@ -21,9 +21,10 @@ static bool esAlfanumerico(const std::string& texto) {
     return true;
 }
 
-// los separadores del protocolo romperian los mensajes si aparecen dentro de un nombre
+// los separadores del protocolo romperian los mensajes si aparecen dentro de un nombre;
+// ':' separa el id del nombre de cada categoria en el mensaje 11
 static bool sinSeparadores(const std::string& texto) {
-    return texto.find_first_of("/,;|") == std::string::npos;
+    return texto.find_first_of("/,;|:") == std::string::npos;
 }
 
 static std::string precioTexto(uint32_t centavos) {
@@ -42,7 +43,7 @@ bool AdministradorBodegas::agregarBodega(const std::string& id, const std::strin
     }
     if (!cabeEnCampo(nombre, sizeof(DirBodega::nombre)) || !sinSeparadores(nombre)) {
         error = "el nombre de bodega debe tener entre 1 y " + std::to_string(sizeof(DirBodega::nombre) - 1) +
-                " caracteres, sin / , ; |";
+                " caracteres, sin / , ; | :";
         return false;
     }
 
@@ -82,7 +83,7 @@ bool AdministradorBodegas::agregarCategoria(const std::string& idBodega, const s
     }
     if (!cabeEnCampo(nombre, sizeof(DirCategoria::nombre)) || !sinSeparadores(nombre)) {
         error = "el nombre de categoria debe tener entre 1 y " + std::to_string(sizeof(DirCategoria::nombre) - 1) +
-                " caracteres, sin / , ; |";
+                " caracteres, sin / , ; | :";
         return false;
     }
 
@@ -208,15 +209,15 @@ std::vector<BodegaVista> AdministradorBodegas::leerInventario() {
     return inventario;
 }
 
-std::vector<std::string> AdministradorBodegas::listarIdsCategorias() {
-    std::vector<std::string> ids;
+std::vector<std::pair<std::string, std::string>> AdministradorBodegas::listarCategorias() {
+    std::vector<std::pair<std::string, std::string>> categorias;
     for (auto& dirBod : fs_.listarBodegas()) {
         Bodega bodega(fs_, dirBod.bloqueDirCategorias);
         for (auto& cat : bodega.listarCategorias()) {
-            ids.push_back(textoCampo(cat.id, sizeof(cat.id)));
+            categorias.push_back({textoCampo(cat.id, sizeof(cat.id)), textoCampo(cat.nombre, sizeof(cat.nombre))});
         }
     }
-    return ids;
+    return categorias;
 }
 
 bool AdministradorBodegas::productosDeCategoria(const std::string& idCategoria,

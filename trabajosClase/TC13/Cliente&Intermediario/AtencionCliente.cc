@@ -79,15 +79,9 @@ RespuestaHttp AtencionCliente::inicio() {
     isla.id = ID_INTERMEDIARIO;
     isla.nombre = "Isla 4";
 
-    for (const auto& id : separar(lista.campos.empty() ? "" : lista.campos[0], ',')) {
-        if (!validarCategoria(id)) continue;
-
-        CategoriaVista categoria;
-        categoria.id = id;
-        categoria.nombre = id;
-
+    for (auto& categoria : leerListaCategorias(lista)) {
         Mensaje productosMsg;
-        if (!consultar(TIPO_REQUEST_PRODUCTS, {id}, productosMsg, fallo)) return fallo;
+        if (!consultar(TIPO_REQUEST_PRODUCTS, {categoria.id}, productosMsg, fallo)) return fallo;
         leerListaProductos(productosMsg, categoria.productos);
         isla.categorias.push_back(categoria);
     }
@@ -112,9 +106,9 @@ RespuestaHttp AtencionCliente::categorias() {
 
     std::ostringstream oss;
     oss << "<ul class=\"categorias\">\n";
-    for (const auto& id : separar(lista.campos.empty() ? "" : lista.campos[0], ',')) {
-        if (!validarCategoria(id)) continue;
-        oss << "<li data-id=\"" << pagina_.escapar(id) << "\">" << pagina_.escapar(id) << "</li>\n";
+    for (const auto& categoria : leerListaCategorias(lista)) {
+        oss << "<li data-id=\"" << pagina_.escapar(categoria.id) << "\" data-nombre=\"" << pagina_.escapar(categoria.nombre)
+            << "\">" << pagina_.escapar(categoria.nombre) << "</li>\n";
     }
     oss << "</ul>\n";
     return respuesta(200, "Categorías", "ok", "", oss.str());
@@ -287,6 +281,20 @@ bool AtencionCliente::leerListaProductos(const Mensaje& mensaje, std::vector<Pro
         productosVista.push_back({partes[0], partes[1], partes[2]});
     }
     return true;
+}
+
+std::vector<CategoriaVista> AtencionCliente::leerListaCategorias(const Mensaje& mensaje) {
+    std::vector<CategoriaVista> categorias;
+    for (const auto& item : separar(mensaje.campos.empty() ? "" : mensaje.campos[0], ',')) {
+        // si una categoria llega sin ':' se usa el id tambien como nombre
+        size_t dosPuntos = item.find(':');
+        CategoriaVista categoria;
+        categoria.id = item.substr(0, dosPuntos);
+        categoria.nombre = (dosPuntos == std::string::npos) ? categoria.id : item.substr(dosPuntos + 1);
+        if (!validarCategoria(categoria.id) || categoria.nombre.empty()) continue;
+        categorias.push_back(categoria);
+    }
+    return categorias;
 }
 
 bool AtencionCliente::leerSesion(const std::string& sesionTexto, int& sesionId) {

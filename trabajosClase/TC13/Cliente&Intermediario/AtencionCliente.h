@@ -36,6 +36,9 @@ private:
     // convierte la lista de un mensaje 22 en vistas; devuelve false si la lista viene mal formada
     bool leerListaProductos(const Mensaje& mensaje, std::vector<ProductoVista>& productos);
 
+    // convierte la lista de un mensaje 11 (id:nombre,id:nombre) en vistas sin productos
+    std::vector<CategoriaVista> leerListaCategorias(const Mensaje& mensaje);
+
     bool leerSesion(const std::string& sesionTexto, int& sesion);
 
     RespuestaHttp respuesta(int codigo, const std::string& titulo, const std::string& estado,

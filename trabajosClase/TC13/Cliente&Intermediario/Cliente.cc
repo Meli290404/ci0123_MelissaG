@@ -115,8 +115,9 @@ void comandoCategorias() {
     std::string html = pedir("/categorias", codigo);
     if (codigo != 200) { mostrarError(html, codigo); return; }
 
+    // el id es lo que se escribe para pedir los productos de la categoria
     for (auto& li : extraerElementos(html, "li")) {
-        std::cout << "  " << extraerAtributo(li, "data-id") << "\n";
+        std::cout << "  " << extraerAtributo(li, "data-id") << "  " << extraerAtributo(li, "data-nombre") << "\n";
     }
 }
 
