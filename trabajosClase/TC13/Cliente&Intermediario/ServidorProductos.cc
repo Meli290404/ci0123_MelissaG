@@ -12,17 +12,18 @@ static const char* RUTA_ARCHIVO = "cafeteria.dat";
 static const int PUERTO_BODEGA = 9091;
 static const int MAXLINE = 512;
 
-// lee hasta el '\n' que cierra el mensaje; deja de leer si pasa del doble de TAM_MAX_MENSAJE
+// lee hasta el '\n' que cierra el mensaje; una linea que pasa de MAX_LINEA sin '\n' se descarta
 std::string leerMensaje(VSocket* conexion) {
     char buf[MAXLINE];
     std::string acumulado;
-    while (acumulado.find('\n') == std::string::npos && acumulado.size() <= 2 * TAM_MAX_MENSAJE) {
+    while (acumulado.find('\n') == std::string::npos && acumulado.size() <= MAX_LINEA) {
         size_t leidos = conexion->Read(buf, sizeof(buf));
         if (leidos == 0) break;
         acumulado.append(buf, leidos);
     }
 
     size_t fin = acumulado.find('\n');
+    if (fin == std::string::npos && acumulado.size() > MAX_LINEA) return "";
     if (fin != std::string::npos) acumulado.erase(fin);
     if (!acumulado.empty() && acumulado.back() == '\r') acumulado.pop_back();
     return acumulado;

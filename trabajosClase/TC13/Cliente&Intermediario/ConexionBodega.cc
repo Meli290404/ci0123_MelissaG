@@ -31,10 +31,10 @@ bool ConexionBodega::intentarUnaVez(const std::string& mensaje, std::string& res
         std::string linea = mensaje + "\n";
         conexion.Write(linea.data(), linea.size());
 
-        // se lee hasta el '\n' que cierra la respuesta o hasta que el servidor cierre la conexion
+        // se lee hasta el '\n' que cierra la respuesta, hasta que el servidor cierre la conexion o hasta MAX_LINEA
         char buf[512];
         std::string acumulado;
-        while (acumulado.find('\n') == std::string::npos && acumulado.size() <= 2 * TAM_MAX_MENSAJE) {
+        while (acumulado.find('\n') == std::string::npos && acumulado.size() <= MAX_LINEA) {
             size_t leidos = conexion.Read(buf, sizeof(buf));
             if (leidos == 0) break;
             acumulado.append(buf, leidos);

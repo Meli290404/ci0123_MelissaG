@@ -18,11 +18,6 @@ static std::string limpiarValor(std::string valor) {
 AtencionBodega::AtencionBodega(AdministradorBodegas& admin) : admin_(admin) {}
 
 std::string AtencionBodega::responder(const std::string& texto) {
-    if (!validarTamanoMensaje(texto)) {
-        return construirMensaje(ID_SERVIDOR, ID_INTERMEDIARIO, TIPO_ERR_TAMANO,
-            {"00", "mensaje", std::to_string(texto.size()), std::to_string(TAM_MAX_MENSAJE)});
-    }
-
     Mensaje msg;
     try {
         msg = parsearMensaje(texto);
@@ -42,27 +37,16 @@ std::string AtencionBodega::responder(const std::string& texto) {
         return errorFormato(destino, tipoOriginal, "destino", msg.destino);
     }
 
-    std::string respuesta;
     switch (msg.tipo) {
         case TIPO_REQUEST_CATEGORIES:
-            respuesta = listaCategorias(destino);
-            break;
+            return listaCategorias(destino);
         case TIPO_REQUEST_PRODUCTS:
-            respuesta = listaProductos(msg, destino);
-            break;
+            return listaProductos(msg, destino);
         case TIPO_RESERVE_STOCK:
-            respuesta = reservar(msg, destino);
-            break;
+            return reservar(msg, destino);
         default:
             return errorFormato(destino, tipoOriginal, "tipo_mensaje", tipoOriginal);
     }
-
-    // una lista muy larga puede pasar del maximo de TAM_MAX_MENSAJE
-    if (!validarTamanoMensaje(respuesta)) {
-        return construirMensaje(ID_SERVIDOR, destino, TIPO_ERR_TAMANO,
-            {tipoOriginal, "respuesta", std::to_string(respuesta.size()), std::to_string(TAM_MAX_MENSAJE)});
-    }
-    return respuesta;
 }
 
 std::string AtencionBodega::listaCategorias(const std::string& destino) {

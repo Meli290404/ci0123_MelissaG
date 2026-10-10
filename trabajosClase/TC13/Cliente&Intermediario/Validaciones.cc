@@ -57,7 +57,3 @@ bool validarDescripcion(const std::string& s) {
 bool validarCount(const std::string& s) {
     return !s.empty() && s.size() <= 3 && esDigitos(s, 0, s.size());
 }
-
-bool validarTamanoMensaje(const std::string& mensajeCompleto) {
-    return mensajeCompleto.size() <= TAM_MAX_MENSAJE;
-}

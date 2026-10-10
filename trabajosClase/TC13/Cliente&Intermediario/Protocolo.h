@@ -5,7 +5,9 @@
 #include <vector>
 #include <cstdint>
 
-const int TAM_MAX_MENSAJE = 256;
+// el protocolo no tiene tamano maximo de mensaje; MAX_LINEA solo evita llenar la memoria
+// si llega una linea que nunca termina en '\n'
+const size_t MAX_LINEA = 65536;
 
 const std::string ID_SERVIDOR = "SERV";
 const std::string ID_INTERMEDIARIO = "INT_04";

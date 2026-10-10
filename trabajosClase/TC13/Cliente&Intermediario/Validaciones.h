@@ -14,6 +14,5 @@ bool validarPrecio(const std::string& s);            // NNNNNN(.NN)?
 bool validarStock(const std::string& s);             // 1-5 digitos
 bool validarDescripcion(const std::string& s);       // 0-100 chars
 bool validarCount(const std::string& s);             // 1-3 digitos
-bool validarTamanoMensaje(const std::string& mensajeCompleto);
 
 #endif
