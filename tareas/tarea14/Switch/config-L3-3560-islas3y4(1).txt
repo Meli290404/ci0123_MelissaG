@@ -1,0 +1,117 @@
+! show running-config del switch L3 3560 (L3-0403), une la isla 3 (VLAN 230) y la isla 4 (VLAN 240)
+! Fa0/1 y Fa0/2 son las troncales hacia los 2960 de cada isla
+! cada svi usa la primera direccion valida de su isla: .49 en la isla 3 y .65 en la isla 4
+! (la segunda es del L2 y el dhcp de cada L2 entrega de la tercera a la ultima)
+!
+!
+version 12.2
+no service pad
+service timestamps debug uptime
+service timestamps log uptime
+no service password-encryption
+!
+hostname L3-0403
+!
+!
+no aaa new-model
+ip subnet-zero
+ip routing
+!
+!
+!
+!
+no file verify auto
+spanning-tree mode pvst
+spanning-tree extend system-id
+!
+vlan internal allocation policy ascending
+!
+! las vlan se guardan en vlan.dat y no aparecen en show running-config;
+! se dejan aqui para que el archivo sirva en un switch reiniciado a fabrica
+vlan 230
+ name Isla3
+!
+vlan 240
+ name Isla4
+!
+interface FastEthernet0/1
+ switchport trunk encapsulation dot1q
+ switchport trunk allowed vlan 230,240
+ switchport mode trunk
+!
+interface FastEthernet0/2
+ switchport trunk encapsulation dot1q
+ switchport trunk allowed vlan 230,240
+ switchport mode trunk
+!
+interface FastEthernet0/3
+!
+interface FastEthernet0/4
+!
+interface FastEthernet0/5
+!
+interface FastEthernet0/6
+!
+interface FastEthernet0/7
+!
+interface FastEthernet0/8
+!
+interface FastEthernet0/9
+!
+interface FastEthernet0/10
+!
+interface FastEthernet0/11
+!
+interface FastEthernet0/12
+!
+interface FastEthernet0/13
+!
+interface FastEthernet0/14
+!
+interface FastEthernet0/15
+!
+interface FastEthernet0/16
+!
+interface FastEthernet0/17
+!
+interface FastEthernet0/18
+!
+interface FastEthernet0/19
+!
+interface FastEthernet0/20
+!
+interface FastEthernet0/21
+!
+interface FastEthernet0/22
+!
+interface FastEthernet0/23
+!
+interface FastEthernet0/24
+!
+interface GigabitEthernet0/1
+!
+interface GigabitEthernet0/2
+!
+interface Vlan1
+ no ip address
+!
+interface Vlan230
+ ip address 172.16.123.49 255.255.255.240
+ no shutdown
+!
+interface Vlan240
+ ip address 172.16.123.65 255.255.255.240
+ no shutdown
+!
+ip classless
+ip http server
+!
+!
+control-plane
+!
+!
+line con 0
+line vty 5 15
+!
+!
+end
