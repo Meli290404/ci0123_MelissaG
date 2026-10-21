@@ -15,6 +15,7 @@
 #define VSocket_h
 
 #include <cstddef>
+#include <string>
 
 class VSocket {
    public:
@@ -44,6 +45,12 @@ class VSocket {
 // UDP methods
       size_t sendTo( const void *, size_t, void * );
       size_t recvFrom( void *, size_t, void * );
+
+// metodos para trabajar con direcciones broadcast 
+      int EnableBroadcast();                                   // permite enviar a una direccion broadcast
+      size_t sendTo( const void *, size_t, const char *, int ); // envia a una ip y puerto dados en texto
+      size_t recvFrom( void *, size_t, std::string &, int & );  // recibe y devuelve la ip y el puerto de quien envio
+      static std::string BroadcastAddress( const char *, int ); // broadcast de una red a partir de ip y prefijo
 
    protected:
       int sockId;   // Socket identifier

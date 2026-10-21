@@ -378,6 +378,111 @@ size_t VSocket::recvFrom( void * buffer, size_t size, void * addr ) {
 
 
 /**
+  *  EnableBroadcast method
+  *    use "setsockopt" Unix system call con la opcion de broadcast
+  *
+  *  Linux no deja enviar un datagrama a una direccion broadcast si el socket
+  *  no tiene esta opcion activa: sendto falla con permiso denegado
+  *
+ **/
+int VSocket::EnableBroadcast() {
+   if ( 'd' != this->type || this->IPv6 ) {
+      throw std::runtime_error( "VSocket::EnableBroadcast, solo para sockets de datagramas ipv4" );
+   }
+
+   int activar = 1;
+   if ( -1 == setsockopt( this->sockId, SOL_SOCKET, SO_BROADCAST, &activar, sizeof( activar ) ) ) {
+      throw std::runtime_error( "VSocket::EnableBroadcast" );
+   }
+
+   return 0;
+}
+
+
+/**
+  *  sendTo method
+  *
+  *  @param	const void * buffer: data to send
+  *  @param	size_t size data size to send
+  *  @param	const char * hostip: ip de destino en texto, puede ser una direccion broadcast
+  *  @param	int port: puerto de destino
+  *
+  *  Arma la direccion de destino y usa el sendTo anterior
+  *
+ **/
+size_t VSocket::sendTo( const void * buffer, size_t size, const char * hostip, int port ) {
+   struct sockaddr_in destino;
+   memset( &destino, 0, sizeof( destino ) );
+   destino.sin_family = AF_INET;
+   destino.sin_port = htons( port );
+
+   if ( inet_pton( AF_INET, hostip, &destino.sin_addr ) <= 0 ) {
+      throw std::runtime_error( "VSocket::sendTo, inet_pton" );
+   }
+
+   return this->sendTo( buffer, size, (void *) &destino );
+}
+
+
+/**
+  *  recvFrom method
+  *
+  *  @param	void * buffer: espacio donde queda el datagrama
+  *  @param	size_t size: capacidad del buffer
+  *  @param	std::string & hostip: queda con la ip de quien envio
+  *  @param	int & port: queda con el puerto de quien envio
+  *
+  *  Al recibir un broadcast no se sabe de antemano quien lo envio, por eso se devuelve su ip
+  *
+ **/
+size_t VSocket::recvFrom( void * buffer, size_t size, std::string & hostip, int & port ) {
+   struct sockaddr_in origen;
+   memset( &origen, 0, sizeof( origen ) );
+
+   size_t recibidos = this->recvFrom( buffer, size, (void *) &origen );
+
+   char texto[ INET_ADDRSTRLEN ];
+   inet_ntop( AF_INET, &origen.sin_addr, texto, sizeof( texto ) );
+   hostip = texto;
+   port = ntohs( origen.sin_port );
+
+   return recibidos;
+}
+
+
+/**
+  *  BroadcastAddress method
+  *
+  *  @param	const char * hostip: una ip de la red, por ejemplo "172.16.123.67"
+  *  @param	int prefijo: bits de la mascara, por ejemplo 28 para 255.255.255.240
+  *
+  *  @return	la direccion broadcast de la red, en el ejemplo "172.16.123.79"
+  *
+  *  Pone en 1 todos los bits de la parte de host de la direccion
+  *
+ **/
+std::string VSocket::BroadcastAddress( const char * hostip, int prefijo ) {
+   if ( prefijo < 0 || prefijo > 32 ) {
+      throw std::runtime_error( "VSocket::BroadcastAddress, prefijo invalido" );
+   }
+
+   struct in_addr direccion;
+   if ( inet_pton( AF_INET, hostip, &direccion ) <= 0 ) {
+      throw std::runtime_error( "VSocket::BroadcastAddress, inet_pton" );
+   }
+
+   // con prefijo 0 la mascara es 0; se evita el corrimiento de 32 bits, que no esta definido
+   uint32_t mascara = ( 0 == prefijo ) ? 0 : 0xFFFFFFFFu << ( 32 - prefijo );
+   uint32_t broadcast = ( ntohl( direccion.s_addr ) & mascara ) | ~mascara;
+   direccion.s_addr = htonl( broadcast );
+
+   char texto[ INET_ADDRSTRLEN ];
+   inet_ntop( AF_INET, &direccion, texto, sizeof( texto ) );
+   return texto;
+}
+
+
+/**
   * SetTimeout method
   *    use "setsockopt" Unix system call con SO_RCVTIMEO y SO_SNDTIMEO
   *
