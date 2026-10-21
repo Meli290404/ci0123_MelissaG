@@ -6,6 +6,7 @@ Este módulo tiene cuatro programas y un script:
 - **`intermediario`**: servidor HTTP en el puerto 8080. Atiende al cliente y al navegador, le pide los datos al servidor de productos y guarda el carrito de cada sesión. La factura se arma con lo ya reservado, sin volver a consultar la bodega.
 - **`cliente`**: cliente de línea de comandos. Pide un número de sesión al intermediario y le hace peticiones HTTP (`/categorias`, `/productos`, `/agregar`, `/factura`).
 - **`adminBodegas`**: programa independiente para crear el archivo y agregar o eliminar bodegas, categorías y productos.
+- **`pruebaBroadcast`**: programa de prueba para los métodos de broadcast de `VSocket`. Envía y recibe mensajes UDP dirigidos a la dirección broadcast de una red.
 - **`cargarInventario.sh`**: crea `cafeteria.dat` con 2 bodegas, 13 categorías y 104 productos, usando `adminBodegas`.
 
 ```
@@ -20,7 +21,7 @@ Parado en esta carpeta:
 make
 ```
 
-Genera cuatro binarios: `servidorProductos`, `intermediario`, `cliente` y `adminBodegas`.
+Genera cinco binarios: `servidorProductos`, `intermediario`, `cliente`, `adminBodegas` y `pruebaBroadcast`.
 
 ## Preparar el inventario
 
@@ -42,7 +43,6 @@ ip -4 addr
 ```
 
 La IP es el número después de `inet` en la interfaz de red (por ejemplo `wlp3s0`), sin el `/24`. No es el número después de `brd`, que es la dirección de broadcast.
-
 
 En los siguientes pasos se usa `<ip>`.
 
@@ -132,9 +132,64 @@ Para ver el archivo por dentro:
 hexdump -C cafeteria.dat | less
 ```
 
+## Broadcast en las clases de sockets
+
+`VSocket` tiene cuatro métodos nuevos para trabajar con direcciones broadcast. Solo sirven con sockets de datagramas (`Socket('d')`) en IPv4, porque broadcast no existe en TCP ni en IPv6.
+
+- **`EnableBroadcast()`**: activa en el socket la opción de broadcast. Sin esto, Linux no deja enviar a una dirección broadcast y `sendTo` falla con `Permission denied`.
+- **`sendTo(buffer, tamaño, ip, puerto)`**: envía un datagrama a una IP y puerto escritos como texto, por ejemplo `"172.16.123.79"` y `9090`.
+- **`recvFrom(buffer, tamaño, ipOrigen, puertoOrigen)`**: recibe un datagrama y deja en `ipOrigen` y `puertoOrigen` los datos de quien lo envió. Con broadcast no se sabe de antemano quién va a enviar, así se puede contestarle directo.
+- **`VSocket::BroadcastAddress(ip, prefijo)`**: calcula la dirección broadcast de una red. Por ejemplo, `("172.16.123.67", 28)` devuelve `172.16.123.79`.
+
+El receptor usa el `Bind(ip, puerto)` que ya existía, pero con la dirección broadcast de la red y no con su propia IP. Si se hace bind a la IP propia, Linux no le entrega los mensajes enviados a la broadcast.
+
+Direcciones broadcast de las redes que se usan:
+
+```
+isla 4     172.16.123.64/28   ->  172.16.123.79
+isla 3     172.16.123.48/28   ->  172.16.123.63
+pública    10.1.35.0/24       ->  10.1.35.255
+```
+
+### Probar el broadcast
+
+Calcular la dirección broadcast de una red (el prefijo es el número después de la `/` en `ip -4 addr`):
+
+```
+./pruebaBroadcast calcular 172.16.123.67 28
+```
+
+Debe mostrar `172.16.123.79`.
+
+**1. Levantar el receptor** (primera terminal, o en otra computadora de la isla):
+
+```
+./pruebaBroadcast receptor 172.16.123.79 9090
+```
+
+Muestra `[receptor] esperando en 172.16.123.79:9090` y se queda esperando.
+
+**2. Enviar un mensaje** (segunda terminal):
+
+```
+./pruebaBroadcast emisor 172.16.123.79 9090 "60/INT_04/172.16.123.67"
+```
+
+El emisor muestra `[emisor] 23 bytes enviados a 172.16.123.79:9090` y el receptor:
+
+```
+[receptor] de 172.16.123.67:51032 -> 60/INT_04/172.16.123.67
+```
+
+La IP es la de la computadora que envió y el puerto lo escoge el sistema en cada envío, así que puede ser otro número.
+
+Se pueden levantar varios receptores en el mismo puerto, en la misma o en distintas computadoras de la isla: un solo envío le llega a todos.
+
+Para probar en una sola computadora fuera del laboratorio, se usa la broadcast de la red de la casa, por ejemplo `192.168.100.255` si la IP es `192.168.100.14/24`.
+
 ## Terminar y limpiar
 
-`Ctrl+C` en la terminal del intermediario y en la del servidor de productos. Después:
+`Ctrl+C` en la terminal del intermediario, en la del servidor de productos y en la del receptor de broadcast. Después:
 
 ```
 make clean
@@ -157,3 +212,6 @@ rm -f cafeteria.dat
 - **La IP cambió**: pasa al cambiar de red WiFi. Volver a revisar con `ip -4 addr`.
 - **El teléfono no carga la página**: tiene que estar en la misma red. Si el firewall está activo (`sudo ufw status`), abrir el puerto con `sudo ufw allow 8080/tcp`.
 - **`cargarInventario.sh` dice que el archivo ya existe**: borrarlo antes con `rm -f cafeteria.dat`.
+- **El receptor de broadcast no recibe nada**: revisar que el receptor use la dirección broadcast (la de `brd`) y no su propia IP, y que emisor y receptor usen el mismo puerto. Si el firewall está activo, abrir el puerto con `sudo ufw allow 9090/udp`.
+- **El broadcast no llega a otra isla**: enviar a la broadcast de otra red (por ejemplo `172.16.123.63`) solo funciona si el switch L3 tiene `ip directed-broadcast` en la interfaz VLAN de esa isla. Cisco lo bloquea por defecto.
+- **`sendTo error: Permission denied`**: el socket no llamó a `EnableBroadcast()` antes de enviar.
