@@ -99,6 +99,40 @@ Reglas:
 
 La tabla de islas se ve en `/rutas` y en el comando `RUTAS` del cliente.
 
+## Atención a otras islas (TCP 9090)
+
+Las otras islas se conectan por TCP a la IP y el puerto que van en nuestro 60. Cada conexión trae una solicitud y recibe una respuesta. El hilo `aceptarIslas` acepta las conexiones y crea un hilo `atenderIsla` por cada una. `AtencionIsla` traduce cada mensaje al protocolo interno:
+
+| Llega | Qué se hace adentro | Respuesta |
+|---|---|---|
+| `10` | categorías de la tabla de rutas, en minúsculas y sin repetir | `01/cafes,tes,...` |
+| `20/categoria` | `20` interno al servidor dueño de la ruta | `01/n/producto,precio,stock;...`, `01/0` si está vacía, `03/categoria` si no existe |
+| `50/producto/cantidad` | busca el producto en los servidores y lo aparta con el `50` interno | `01`, `02/103` si no alcanza, `03/producto` si no existe |
+| `40/n/producto,cantidad;...` | revisa que cada producto tenga reserva vigente de esa isla | `01/total/n/producto,cantidad,subtotal;...` o `02/104` |
+| otro tipo | — | `02/101` |
+| mensaje roto o campos de más o de menos | — | `02/100` |
+| valor que no cumple la expresión regular | — | `02/102` |
+
+- **Mayúsculas**: categorías y productos se buscan en minúsculas, así que `20/CAFES` y `50/espresso/1` encuentran `cafes` y `Espresso`.
+- **Reservas**: se guardan por IP de la isla y duran 60 s. Si vencen sin compra, el hilo `vencerReservas` le devuelve el stock al servidor con el mensaje interno **52**. Si al reservar el servidor aparta menos de lo pedido, también se devuelve lo apartado y se contesta `02/103`.
+- **Fin del mensaje**: se lee hasta el `\n`, hasta que la otra isla cierre su lado o hasta un segundo sin datos. Las respuestas se mandan terminadas en `\n`.
+
+Mensajes internos nuevos, entre intermediario y servidor de productos:
+
+| Tipo | Formato | Para qué |
+|---|---|---|
+| **52** | `INT_04\|SERV_NN/52/<producto>/<cantidad>` | Devolver stock reservado que no se usó |
+| **53** | `SERV_NN\|INT_04/53/<producto>/<cantidad devuelta>` | Respuesta al 52 (o `27` si el producto ya no existe) |
+
+Para probar sin otra isla, con `nc`:
+
+```
+echo "10" | nc <ip privada> 9090
+echo "20/cafes" | nc <ip privada> 9090
+echo "50/espresso/2" | nc <ip privada> 9090
+echo "40/1/espresso,2" | nc <ip privada> 9090
+```
+
 ## Compilar
 
 ```
@@ -223,7 +257,7 @@ Para ver el archivo por dentro: `hexdump -C fs1.dat.ci0123 | less`.
 ## Problemas comunes
 
 - **`no se encontro la direccion de broadcast`**: la IP no es de ninguna interfaz. Revisar con `ip -4 addr` o pasar el broadcast como último argumento.
-- **Las otras islas no aparecen**: el firewall debe dejar pasar UDP 9090 (`sudo ufw allow 9090/udp`), y el switch L3 debe permitir el broadcast dirigido hacia cada VLAN.
+- **Las otras islas no aparecen o no se pueden conectar**: el firewall debe dejar pasar UDP y TCP 9090 (`sudo ufw allow 9090`), y el switch L3 debe permitir el broadcast dirigido hacia cada VLAN.
 - **El cliente dice `el intermediario todavia no ha descubierto ningun servidor`**: ningún servidor contestó el 82. Revisar que estén en la misma red y que el firewall deje pasar UDP 9091 y 9092 (`sudo ufw allow 9091/udp`, `sudo ufw allow 9092/udp`).
 - **`Address already in use`** en TCP: ya hay un servidor con ese mismo número. Cada servidor necesita un número distinto.
 - **Dos servidores en la misma computadora**: los dos escuchan UDP 9092 (gracias a `SO_REUSEADDR`) y a los dos les llega el 82. El 81, que va directo, solo le llega a uno, así que el otro sigue mandando su 80 hasta 3 veces; no afecta, porque igual queda registrado.
