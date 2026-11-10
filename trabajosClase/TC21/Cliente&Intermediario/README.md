@@ -133,6 +133,19 @@ echo "50/espresso/2" | nc <ip privada> 9090
 echo "40/1/espresso,2" | nc <ip privada> 9090
 ```
 
+## El cliente compra en otras islas
+
+Cuando algo no está en la isla 4, el intermediario se lo pide a las otras islas con el protocolo mancomunado. `ConexionIsla` manda cada mensaje por TCP con timeout de 5 s y hasta 3 intentos, como recomienda el protocolo. Si una isla no contesta, queda `sin-respuesta` en la tabla de islas y no se vuelve a usar hasta su próximo 60.
+
+| El cliente pide | Qué hace el intermediario |
+|---|---|
+| `CATEGORIAS` | junta las categorías de la isla 4 y las de cada isla activa (`10`). Las que la isla 4 ya tiene no se repiten; las demás salen con `(de INT_NN)` |
+| `<categoria>` | si la isla 4 no tiene productos de esa categoría, le pide un `20` a cada isla que la tiene. Los productos salen con `isla: INT_NN` |
+| `AGREGAR <producto> <n>` | si ningún servidor de la isla 4 lo tiene, lo busca en lo que las islas ya mostraron (si no lo ha visto, les pide sus productos) y lo reserva con un `50`. Como el `50` es todo o nada, si la isla tiene menos se pide lo que tiene |
+| `FACTURA` | lo de la isla 4 se cobra como siempre. Lo de cada otra isla se compra con un `40` a esa isla y se usan los subtotales que ella cobra. Si la reserva venció (`02/104`), se vuelve a reservar y se intenta el `40` otra vez; si no se puede comprar, la línea sale `no se pudo comprar` y no suma al total |
+
+Cuando se descubre una isla nueva, el intermediario le pide sus categorías en un hilo aparte (`conocerIsla`), para no detener al hilo que escucha el UDP. `/rutas` muestra cuántas categorías tiene cada isla.
+
 ## Compilar
 
 ```
@@ -221,7 +234,18 @@ Para probar una categoría repetida se puede crear un tercer servidor con `fruta
 
 El intermediario muestra `aviso: SERV_03 repite la categoria frutas (SERV_02)` y la ruta de `frutas` sigue siendo de SERV_02. Si SERV_02 se apaga, la ruta pasa a SERV_03.
 
-Navegador: `http://<ip>:8080/` (inventario por servidor) y `http://<ip>:8080/rutas` (tabla de rutas).
+Navegador: `http://<ip>:8080/` abre el menú, con un botón por página. Todas las páginas tienen arriba una barra para moverse entre ellas.
+
+| Página | Qué muestra |
+|---|---|
+| `/` | Menú, con cuántos servidores e islas hay activos |
+| `/inventario` | Todos los productos: una sección por servidor de la isla y una por cada otra isla |
+| `/categorias` | Las categorías de la isla y de las otras islas; cada una lleva a sus productos |
+| `/servidores` | Los servidores de productos descubiertos y su estado |
+| `/rutas` | La tabla de rutas completa (servidores, rutas por categoría y otras islas) |
+| `/islas` | Las otras islas descubiertas, su estado y sus categorías |
+
+`/servidores`, `/rutas` e `/islas` se recargan solas cada 2 segundos.
 
 ### Probar varias islas en una sola computadora
 

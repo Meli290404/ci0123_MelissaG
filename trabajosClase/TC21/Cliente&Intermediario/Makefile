@@ -9,7 +9,7 @@ all: servidorProductos intermediario cliente adminBodegas
 servidorProductos: ServidorProductos.cc AtencionBodega.cc Protocolo.cc Descubrimiento.cc $(RED) $(COMUNES)
 	$(CXX) $(CXXFLAGS) $^ -o servidorProductos
 
-intermediario: Intermediario.cc AtencionCliente.cc ConsultaServidor.cc ConexionBodega.cc TablaRutas.cc TablaIslas.cc Mancomunado.cc AtencionIsla.cc Reservas.cc Descubrimiento.cc Carritos.cc PaginaWeb.cc HttpUtil.cc Protocolo.cc Validaciones.cc $(RED)
+intermediario: Intermediario.cc AtencionCliente.cc ConsultaServidor.cc ConexionBodega.cc TablaRutas.cc TablaIslas.cc Mancomunado.cc AtencionIsla.cc Reservas.cc ConexionIsla.cc Descubrimiento.cc Carritos.cc PaginaWeb.cc HttpUtil.cc Protocolo.cc Validaciones.cc $(RED)
 	$(CXX) $(CXXFLAGS) $^ -o intermediario
 
 cliente: Cliente.cc HttpUtil.cc $(RED)
