@@ -184,8 +184,10 @@ void comandoCategorias() {
     for (auto& li : extraerElementos(html, "li")) {
         std::string id = extraerAtributo(li, "data-id");
         std::string nombre = extraerAtributo(li, "data-nombre");
+        std::string isla = extraerAtributo(li, "data-isla");
         std::cout << "  " << id;
         if (!nombre.empty() && nombre != id) std::cout << "  " << nombre;
+        if (!isla.empty()) std::cout << "  (de " << isla << ")";
         std::cout << "\n";
     }
 }
@@ -202,7 +204,10 @@ void comandoProductos(const std::string& idCategoria) {
     for (auto& fila : extraerElementos(html, "tr")) {
         std::cout << "  " << extraerAtributo(fila, "data-nombre")
                   << " | precio: " << extraerAtributo(fila, "data-precio")
-                  << " | stock: " << extraerAtributo(fila, "data-stock") << "\n";
+                  << " | stock: " << extraerAtributo(fila, "data-stock");
+        std::string isla = extraerAtributo(fila, "data-isla");
+        if (!isla.empty()) std::cout << " | isla: " << isla;
+        std::cout << "\n";
     }
 }
 
@@ -220,7 +225,9 @@ void comandoAgregar(const std::string& args) {
     if (estado == "agregado") {
         std::string reservado = extraerAtributo(html, "data-cantidad");
         std::string pedido = extraerAtributo(html, "data-pedido");
-        std::cout << "  agregado " << reservado << " x " << nombre << " @ " << extraerAtributo(html, "data-precio") << "\n";
+        std::string isla = extraerAtributo(html, "data-isla");
+        std::cout << "  agregado " << reservado << " x " << nombre << " @ " << extraerAtributo(html, "data-precio")
+                  << (isla.empty() ? "" : " de " + isla) << "\n";
         if (reservado != pedido) {
             std::cout << "  solo habia " << reservado << " disponibles de los " << pedido << " pedidos\n";
         }
@@ -247,7 +254,10 @@ void comandoFactura() {
     for (auto& fila : extraerElementos(html, "tr")) {
         std::cout << "  " << extraerAtributo(fila, "data-producto")
                   << " x" << extraerAtributo(fila, "data-cantidad")
-                  << " = " << extraerAtributo(fila, "data-subtotal") << "\n";
+                  << " = " << extraerAtributo(fila, "data-subtotal")
+                  << "  (" << extraerAtributo(fila, "data-isla") << ")";
+        if (extraerAtributo(fila, "data-estado") == "no-comprado") std::cout << "  no se pudo comprar";
+        std::cout << "\n";
     }
     std::cout << "TOTAL: " << extraerAtributo(html, "data-total") << "\n";
 }
