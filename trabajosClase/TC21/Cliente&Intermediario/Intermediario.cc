@@ -2,6 +2,12 @@
 #include <thread>
 #include <csignal>
 #include <chrono>
+#include <atomic>
+#include <cstdio>
+#include <cstdlib>
+#include <sstream>
+#include <pthread.h>
+#include <unistd.h>
 
 #include "Socket.h"
 #include "HttpUtil.h"
@@ -10,9 +16,30 @@
 #include "TablaRutas.h"
 #include "Descubrimiento.h"
 #include "Validaciones.h"
+#include "Mancomunado.h"
+#include "TablaIslas.h"
 
 static const int PUERTO_CLIENTES = 8080;
 static const int SEGUNDOS_ENTRE_82 = 10;   // menos que TablaRutas::SEGUNDOS_VIGENCIA
+static const int VECES_ANUNCIO_INICIAL = 2;   // el mismo 60 se repite por si se pierde un datagrama
+
+// datos de esta isla para el protocolo mancomunado
+struct DatosIsla {
+    std::string id;                        // INT_04
+    std::string ip;                        // ip privada, la que va en el 60
+    int puerto;                            // puerto tcp que va en el 60
+    std::vector<std::string> broadcasts;   // a donde se mandan el 60 y el 61
+};
+
+// ID_MSG del 60: cada anuncio lleva uno distinto. arranca en un numero al azar para que,
+// si el intermediario se reinicia, sus anuncios nuevos no parezcan duplicados de los viejos
+static std::atomic<int> siguienteIdMensaje(0);
+
+static std::string nuevoIdMensaje() {
+    char texto[8];
+    snprintf(texto, sizeof(texto), "%04d", siguienteIdMensaje++ % 10000);
+    return texto;
+}
 static const int MAXLINE = 4096;
 static const size_t MAX_PETICION = 8192;
 
@@ -28,7 +55,7 @@ std::string leerPeticion(VSocket* cliente) {
     return acumulado;
 }
 
-void atenderCliente(VSocket* cliente, TablaRutas* rutas, Carritos* carritos) {
+void atenderCliente(VSocket* cliente, TablaRutas* rutas, TablaIslas* islas, Carritos* carritos) {
     try {
         std::string peticion = leerPeticion(cliente);
 
@@ -36,7 +63,7 @@ void atenderCliente(VSocket* cliente, TablaRutas* rutas, Carritos* carritos) {
         if (!peticion.empty()) {
             std::cout << "[CLI -> INT] " << peticion.substr(0, peticion.find("\r\n")) << "\n";
 
-            AtencionCliente atencion(*rutas, *carritos);
+            AtencionCliente atencion(*rutas, *islas, *carritos);
             RespuestaHttp respuesta = atencion.responder(peticion);
 
             std::cout << "[INT -> CLI] http " << respuesta.codigo << "\n";
@@ -152,9 +179,138 @@ void llamarServidores(Socket* udp, std::string broadcast) {
     }
 }
 
+// manda un mismo mensaje mancomunado al broadcast de cada isla. si una direccion falla se sigue
+// con las demas, porque las otras islas no tienen por que estar conectadas
+static void mandarATodasLasIslas(Socket* udp, const DatosIsla& isla, const std::string& mensaje) {
+    for (const auto& broadcast : isla.broadcasts) {
+        try {
+            enviarDatagrama(*udp, mensaje, broadcast, PUERTO_MANCOMUNADO);
+        } catch (const std::exception& e) {
+            std::cerr << "no se pudo mandar " << mensaje << " a " << broadcast << ": " << e.what() << "\n";
+        }
+    }
+}
+
+// 60/ID_MSG/INT_04/<ip>/<puerto> a todas las islas, con un ID_MSG nuevo
+static void anunciarIsla(Socket* udp, const DatosIsla& isla, const std::string& motivo) {
+    std::string mensaje = armarMancomunado(MAN_ANNOUNCE, {nuevoIdMensaje(), isla.id, isla.ip, std::to_string(isla.puerto)});
+    mandarATodasLasIslas(udp, isla, mensaje);
+    std::cout << "[MAN UDP " << isla.id << " -> " << isla.broadcasts.size() << " islas] " << mensaje
+              << " (" << motivo << ")\n";
+}
+
+// hilo que anuncia la isla al arrancar. el mismo 60, con el mismo ID_MSG, se manda dos veces:
+// si el primero se pierde llega el segundo, y si llegan los dos el receptor descarta el repetido
+void anunciarAlArrancar(Socket* udp, DatosIsla isla) {
+    std::string mensaje = armarMancomunado(MAN_ANNOUNCE, {nuevoIdMensaje(), isla.id, isla.ip, std::to_string(isla.puerto)});
+    for (int vez = 1; vez <= VECES_ANUNCIO_INICIAL; vez++) {
+        mandarATodasLasIslas(udp, isla, mensaje);
+        std::cout << "[MAN UDP " << isla.id << " -> " << isla.broadcasts.size() << " islas] " << mensaje
+                  << " (anuncio inicial, vez " << vez << ")\n";
+        std::this_thread::sleep_for(std::chrono::seconds(1));
+    }
+}
+
+// hilo que espera con recvFrom los anuncios de las otras islas en el puerto udp 9090:
+//   60: una isla se anuncia; se registra en la tabla de islas
+//   61: una isla se despide; se da de baja
+// por udp no se contesta con 02: no hay conexion por donde responder, solo se descarta
+void escucharIslas(Socket* udp, TablaIslas* islas, DatosIsla isla) {
+    for (;;) {
+        std::string ip;
+        int puerto;
+        std::string texto;
+        try {
+            texto = recibirDatagrama(*udp, ip, puerto);
+        } catch (const std::exception& e) {
+            std::cerr << "error recibiendo datagrama: " << e.what() << "\n";
+            continue;
+        }
+
+        MensajeMancomunado msg;
+        try {
+            msg = parsearMancomunado(texto);
+        } catch (const std::exception&) {
+            std::cout << "[MAN UDP " << ip << "] datagrama descartado, no cumple el protocolo: " << texto << "\n";
+            continue;
+        }
+
+        if (msg.tipo == MAN_ANNOUNCE) {
+            const auto& c = msg.campos;
+            if (c.size() != 4 || !validarIdMensaje(c[0]) || !validarIdIsla(c[1]) || !validarIp(c[2]) ||
+                !validarPuertoMancomunado(c[3])) {
+                std::cout << "[MAN UDP " << ip << "] 60 mal formado, se descarta: " << texto << "\n";
+                continue;
+            }
+            // nuestro propio 60 tambien llega, porque nuestra red esta en la lista de broadcasts
+            if (c[1] == isla.id) continue;
+            if (islas->yaVisto(c[1], c[0])) {
+                std::cout << "[MAN UDP " << c[1] << " -> " << isla.id << "] " << texto << " (repetido, se descarta)\n";
+                continue;
+            }
+
+            std::cout << "[MAN UDP " << c[1] << " -> " << isla.id << "] " << texto << "\n";
+            TablaIslas::Resultado resultado = islas->actualizar(c[1], c[2], std::stoi(c[3]));
+            if (resultado == TablaIslas::IGUAL) continue;
+            std::cout << "[INT] tabla de islas: " << c[1] << " en " << c[2] << ":" << c[3] << " ("
+                      << (resultado == TablaIslas::NUEVA ? "nueva" : "cambio") << ")\n";
+
+            // la isla nueva arranco despues que nosotros y no oyo nuestro 60: se anuncia otra vez.
+            // las islas que ya nos conocen lo reciben como IGUAL y no contestan, asi que no hay bucle
+            if (resultado == TablaIslas::NUEVA) anunciarIsla(udp, isla, "para que " + c[1] + " nos conozca");
+
+        } else if (msg.tipo == MAN_ANNOUNCE_BYE) {
+            if (msg.campos.size() != 1 || !validarIdIsla(msg.campos[0])) {
+                std::cout << "[MAN UDP " << ip << "] 61 mal formado, se descarta: " << texto << "\n";
+                continue;
+            }
+            if (msg.campos[0] == isla.id) continue;
+            std::cout << "[MAN UDP " << msg.campos[0] << " -> " << isla.id << "] " << texto << "\n";
+            if (islas->darDeBaja(msg.campos[0])) {
+                std::cout << "[INT] tabla de islas: " << msg.campos[0] << " se despidio, queda de baja\n";
+            }
+
+        } else {
+            std::cout << "[MAN UDP " << ip << "] tipo " << msg.tipo << " no va por udp, se descarta\n";
+        }
+    }
+}
+
+// hilo que espera ctrl+c o kill con sigwait, igual que en servidorProductos. antes de terminar
+// se despide de las otras islas con un 61 para que nos den de baja
+void esperarApagado(Socket* udp, DatosIsla isla, sigset_t senales) {
+    int senal = 0;
+    sigwait(&senales, &senal);
+    std::string mensaje = armarMancomunado(MAN_ANNOUNCE_BYE, {isla.id});
+    mandarATodasLasIslas(udp, isla, mensaje);
+    std::cout << "[MAN UDP " << isla.id << " -> " << isla.broadcasts.size() << " islas] " << mensaje << "\n";
+    std::cout << "[INT] se apaga (senal " << senal << ")\n";
+    std::exit(0);
+}
+
+// lista separada por comas
+static std::vector<std::string> separarComas(const std::string& texto) {
+    std::vector<std::string> partes;
+    std::stringstream ss(texto);
+    std::string parte;
+    while (std::getline(ss, parte, ',')) {
+        if (!parte.empty()) partes.push_back(parte);
+    }
+    return partes;
+}
+
+static void mostrarUso(const char* programa) {
+    std::cerr << "uso: " << programa << " <ip donde escucha a los clientes> <ip de la red de los servidores> [broadcast]\n"
+              << "       [-isla NN] [-islas b1,b2,...] [-puerto N] [-http N]\n"
+              << "  -isla    numero de isla para el mancomunado (por defecto 04)\n"
+              << "  -islas   broadcasts donde se mandan el 60 y el 61 (por defecto los de las islas del laboratorio)\n"
+              << "  -puerto  puerto tcp que se anuncia en el 60 (por defecto " << PUERTO_MANCOMUNADO << ")\n"
+              << "  -http    puerto donde se atiende a los clientes (por defecto " << PUERTO_CLIENTES << ")\n";
+}
+
 int main(int argc, char* argv[]) {
     if (argc < 3) {
-        std::cerr << "uso: " << argv[0] << " <ip donde escucha a los clientes> <ip de la red de los servidores> [broadcast]\n";
+        mostrarUso(argv[0]);
         return 1;
     }
     const char* ipClientes = argv[1];
@@ -164,48 +320,110 @@ int main(int argc, char* argv[]) {
         return 1;
     }
 
-    // el broadcast sale de la ip de la red de los servidores (en la isla 4, 172.16.123.79)
-    std::string broadcast = argc >= 4 ? argv[3] : broadcastDe(ipPrivada);
+    // el broadcast de la isla sale de la ip de la red de los servidores (en la isla 4, 172.16.123.79)
+    int siguiente = 3;
+    std::string broadcast;
+    if (argc > 3 && argv[3][0] != '-') broadcast = argv[siguiente++];
+    else broadcast = broadcastDe(ipPrivada);
     if (broadcast.empty() || !validarIp(broadcast)) {
         std::cerr << "no se encontro la direccion de broadcast de " << ipPrivada << ", pasela como tercer argumento\n";
         return 1;
     }
 
+    // datos para el mancomunado; las opciones son para probar varias islas en una sola computadora
+    DatosIsla isla;
+    isla.id = ID_INTERMEDIARIO;
+    isla.ip = ipPrivada;
+    isla.puerto = PUERTO_MANCOMUNADO;
+    isla.broadcasts = BROADCASTS_ISLAS;
+    int puertoClientes = PUERTO_CLIENTES;
+    for (; siguiente < argc; siguiente++) {
+        std::string opcion = argv[siguiente];
+        if (siguiente + 1 >= argc) {
+            mostrarUso(argv[0]);
+            return 1;
+        }
+        std::string valor = argv[++siguiente];
+        if (opcion == "-isla" && valor.size() == 2 && validarIdIsla("INT_" + valor)) {
+            isla.id = "INT_" + valor;
+        } else if (opcion == "-islas" && !separarComas(valor).empty()) {
+            isla.broadcasts = separarComas(valor);
+        } else if (opcion == "-puerto" && validarPuertoMancomunado(valor)) {
+            isla.puerto = std::stoi(valor);
+        } else if (opcion == "-http" && validarPuerto(valor)) {
+            puertoClientes = std::stoi(valor);
+        } else {
+            mostrarUso(argv[0]);
+            return 1;
+        }
+    }
+    for (const auto& b : isla.broadcasts) {
+        if (!validarIp(b)) {
+            std::cerr << b << " no es una ip valida\n";
+            return 1;
+        }
+    }
+
     // si un cliente cierra la conexion antes de tiempo, write no debe terminar todo el proceso
     signal(SIGPIPE, SIG_IGN);
 
-    // las dos se comparten entre todos los hilos y cada una protege sus datos con su propio mutex
+    // sigint y sigterm solo los recibe esperarApagado (igual que en ServidorProductos.cc)
+    sigset_t senales;
+    sigemptyset(&senales);
+    sigaddset(&senales, SIGINT);
+    sigaddset(&senales, SIGTERM);
+    pthread_sigmask(SIG_BLOCK, &senales, nullptr);
+
+    srand(time(nullptr) ^ getpid());
+    siguienteIdMensaje = rand() % 10000;
+
+    // las tres se comparten entre todos los hilos y cada una protege sus datos con su propio mutex
     TablaRutas rutas;
+    TablaIslas islas;
     Carritos carritos;
 
     VSocket* servidor = new Socket('s');
     Socket* udp = new Socket('d');
+    Socket* udpIslas = new Socket('d');
     try {
-        servidor->Bind(ipClientes, PUERTO_CLIENTES);
+        servidor->Bind(ipClientes, puertoClientes);
         servidor->MarkPassive(10);
 
         // el socket udp se liga a todas las interfaces: si se liga a la ip no le llegan los broadcast
         udp->Bind(PUERTO_UDP_INTERMEDIARIO);
         udp->HabilitarBroadcast();
+
+        // otro socket udp para el mancomunado, tambien ligado a todas las interfaces
+        udpIslas->Bind(PUERTO_MANCOMUNADO);
+        udpIslas->HabilitarBroadcast();
     } catch (const std::exception& e) {
         std::cerr << "no se pudo abrir el intermediario: " << e.what() << "\n";
         delete servidor;
         delete udp;
+        delete udpIslas;
         return 1;
     }
 
-    std::cout << "intermediario escuchando en http://" << ipClientes << ":" << PUERTO_CLIENTES << "/\n";
+    std::cout << "intermediario escuchando en http://" << ipClientes << ":" << puertoClientes << "/\n";
     std::cout << "descubrimiento por udp en el puerto " << PUERTO_UDP_INTERMEDIARIO << ", broadcast " << broadcast << "\n";
-    std::cout << "tabla de rutas en http://" << ipClientes << ":" << PUERTO_CLIENTES << "/rutas\n";
+    std::cout << "tabla de rutas en http://" << ipClientes << ":" << puertoClientes << "/rutas\n";
+    std::cout << "mancomunado como " << isla.id << " en el puerto udp " << PUERTO_MANCOMUNADO << ", anuncia "
+              << isla.ip << ":" << isla.puerto << "\n";
 
     std::thread escucha(escucharServidores, udp, &rutas);
     escucha.detach();
     std::thread llamada(llamarServidores, udp, broadcast);
     llamada.detach();
+    std::thread escuchaIslas(escucharIslas, udpIslas, &islas, isla);
+    escuchaIslas.detach();
+    std::thread anuncio(anunciarAlArrancar, udpIslas, isla);
+    anuncio.detach();
+    std::thread apagado(esperarApagado, udpIslas, isla, senales);
+    apagado.detach();
 
     for (;;) {
         VSocket* cliente = servidor->AcceptConnection();
-        std::thread trabajador(atenderCliente, cliente, &rutas, &carritos);
+        std::thread trabajador(atenderCliente, cliente, &rutas, &islas, &carritos);
         trabajador.detach();
     }
 
