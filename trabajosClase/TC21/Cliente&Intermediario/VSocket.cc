@@ -437,3 +437,41 @@ void VSocket::ArmarDireccion( const char * ip, int puerto, void * addr ) {
       throw std::runtime_error( "VSocket::ArmarDireccion, ip invalida" );
    }
 }
+
+
+/**
+  *  IpRemota method
+  *    use "getpeername" para saber quien esta del otro lado de la conexion
+  *
+  *  @returns   la ip en notacion de puntos, o "" si no se pudo obtener
+  *
+ **/
+std::string VSocket::IpRemota() {
+   struct sockaddr_in remota;
+   socklen_t largo = sizeof( remota );
+   memset( &remota, 0, sizeof( remota ) );
+   if ( -1 == getpeername( this->sockId, (struct sockaddr *) &remota, &largo ) ) {
+      return "";
+   }
+   char texto[ INET_ADDRSTRLEN ];
+   inet_ntop( AF_INET, &remota.sin_addr, texto, sizeof( texto ) );
+   return texto;
+}
+
+
+/**
+  *  TiempoMaximoLectura method
+  *    use "setsockopt" con SO_RCVTIMEO
+  *
+  *  @param	int segundos: tiempo maximo que Read espera datos antes de fallar
+  *
+ **/
+int VSocket::TiempoMaximoLectura( int segundos ) {
+   struct timeval espera;
+   espera.tv_sec = segundos;
+   espera.tv_usec = 0;
+   if ( -1 == setsockopt( this->sockId, SOL_SOCKET, SO_RCVTIMEO, &espera, sizeof( espera ) ) ) {
+      throw std::runtime_error( "VSocket::TiempoMaximoLectura" );
+   }
+   return 0;
+}
