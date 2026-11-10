@@ -20,6 +20,7 @@
 #include "TablaIslas.h"
 #include "Reservas.h"
 #include "AtencionIsla.h"
+#include "ConexionIsla.h"
 
 static const int PUERTO_CLIENTES = 8080;
 static const int SEGUNDOS_ENTRE_82 = 10;   // menos que TablaRutas::SEGUNDOS_VIGENCIA
@@ -216,6 +217,15 @@ void anunciarAlArrancar(Socket* udp, DatosIsla isla) {
     }
 }
 
+// hilo corto que le pide las categorias (10) a una isla recien descubierta. va aparte para que
+// la espera de la conexion tcp no detenga al hilo que escucha el udp
+void conocerIsla(TablaIslas* islas, IslaRuta isla) {
+    std::vector<std::string> categorias;
+    if (pedirCategoriasIsla(*islas, isla, categorias)) {
+        std::cout << "[INT] tabla de islas: " << isla.id << " tiene " << categorias.size() << " categorias\n";
+    }
+}
+
 // hilo que espera con recvFrom los anuncios de las otras islas en el puerto udp 9090:
 //   60: una isla se anuncia; se registra en la tabla de islas
 //   61: una isla se despide; se da de baja
@@ -264,6 +274,10 @@ void escucharIslas(Socket* udp, TablaIslas* islas, DatosIsla isla) {
             // las islas que ya nos conocen lo reciben como IGUAL y no contestan, asi que no hay bucle
             if (resultado == TablaIslas::NUEVA) anunciarIsla(udp, isla, "para que " + c[1] + " nos conozca");
 
+            IslaRuta nueva = {c[1], c[2], std::stoi(c[3]), time(nullptr), true, false, {}};
+            std::thread consulta(conocerIsla, islas, nueva);
+            consulta.detach();
+
         } else if (msg.tipo == MAN_ANNOUNCE_BYE) {
             if (msg.campos.size() != 1 || !validarIdIsla(msg.campos[0])) {
                 std::cout << "[MAN UDP " << ip << "] 61 mal formado, se descarta: " << texto << "\n";
@@ -299,7 +313,7 @@ void esperarApagado(Socket* udp, DatosIsla isla, sigset_t senales) {
 static std::string leerSolicitudIsla(VSocket* conexion) {
     char buf[1024];
     std::string acumulado;
-    conexion->TiempoMaximoLectura(SEGUNDOS_ESPERA_ISLA);
+    conexion->SetTimeout(SEGUNDOS_ESPERA_ISLA);
     while (acumulado.find('\n') == std::string::npos && acumulado.size() <= MAX_SOLICITUD_ISLA) {
         size_t leidos = 0;
         try {
@@ -309,7 +323,7 @@ static std::string leerSolicitudIsla(VSocket* conexion) {
         }
         if (leidos == 0) break;
         acumulado.append(buf, leidos);
-        conexion->TiempoMaximoLectura(1);
+        conexion->SetTimeout(1);
     }
     size_t fin = acumulado.find('\n');
     if (fin != std::string::npos) acumulado.erase(fin);

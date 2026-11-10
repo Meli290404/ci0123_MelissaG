@@ -49,7 +49,6 @@ class VSocket {
       int HabilitarBroadcast();                                  // SO_BROADCAST, para mandar a la direccion de broadcast
       static void ArmarDireccion( const char *, int, void * );   // ip + puerto -> sockaddr_in para sendTo
       std::string IpRemota();                                    // ip del otro extremo de una conexion tcp
-      int TiempoMaximoLectura( int );                            // SO_RCVTIMEO: Read falla si pasan esos segundos sin datos
 
    protected:
       int sockId;   // Socket identifier

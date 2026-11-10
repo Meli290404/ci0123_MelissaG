@@ -457,21 +457,3 @@ std::string VSocket::IpRemota() {
    inet_ntop( AF_INET, &remota.sin_addr, texto, sizeof( texto ) );
    return texto;
 }
-
-
-/**
-  *  TiempoMaximoLectura method
-  *    use "setsockopt" con SO_RCVTIMEO
-  *
-  *  @param	int segundos: tiempo maximo que Read espera datos antes de fallar
-  *
- **/
-int VSocket::TiempoMaximoLectura( int segundos ) {
-   struct timeval espera;
-   espera.tv_sec = segundos;
-   espera.tv_usec = 0;
-   if ( -1 == setsockopt( this->sockId, SOL_SOCKET, SO_RCVTIMEO, &espera, sizeof( espera ) ) ) {
-      throw std::runtime_error( "VSocket::TiempoMaximoLectura" );
-   }
-   return 0;
-}
