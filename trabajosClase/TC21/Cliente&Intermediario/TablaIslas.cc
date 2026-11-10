@@ -1,4 +1,5 @@
 #include "TablaIslas.h"
+#include "Mancomunado.h"
 
 bool TablaIslas::yaVisto(const std::string& idIsla, const std::string& idMensaje) {
     std::lock_guard<std::mutex> lock(mutex_);
@@ -22,9 +23,13 @@ TablaIslas::Resultado TablaIslas::actualizar(const std::string& id, const std::s
     Resultado resultado = NUEVA;
     auto it = islas_.find(id);
     if (it != islas_.end() && it->second.activa) {
-        resultado = (it->second.ip == ip && it->second.puerto == puerto) ? IGUAL : CAMBIO;
+        bool igual = it->second.ip == ip && it->second.puerto == puerto && !it->second.sinRespuesta;
+        resultado = igual ? IGUAL : CAMBIO;
     }
-    islas_[id] = {id, ip, puerto, time(nullptr), true};
+    // si sigue en la misma ip y puerto se conservan las categorias; si no, se vuelven a pedir
+    std::vector<std::string> categorias;
+    if (resultado == IGUAL) categorias = it->second.categorias;
+    islas_[id] = {id, ip, puerto, time(nullptr), true, false, categorias};
     return resultado;
 }
 
@@ -34,6 +39,40 @@ bool TablaIslas::darDeBaja(const std::string& id) {
     if (it == islas_.end() || !it->second.activa) return false;
     it->second.activa = false;
     return true;
+}
+
+void TablaIslas::marcarSinRespuesta(const std::string& id) {
+    std::lock_guard<std::mutex> lock(mutex_);
+    auto it = islas_.find(id);
+    if (it != islas_.end()) it->second.sinRespuesta = true;
+}
+
+void TablaIslas::guardarCategorias(const std::string& id, const std::vector<std::string>& categorias) {
+    std::lock_guard<std::mutex> lock(mutex_);
+    auto it = islas_.find(id);
+    if (it != islas_.end()) it->second.categorias = categorias;
+}
+
+void TablaIslas::guardarProductos(const std::string& id, const std::vector<ProductoDeIsla>& productos) {
+    std::lock_guard<std::mutex> lock(mutex_);
+    for (const auto& p : productos) productos_[id + "/" + aMinusculas(p.nombre)] = p;
+}
+
+std::vector<ProductoDeIsla> TablaIslas::buscarProducto(const std::string& nombre) {
+    std::lock_guard<std::mutex> lock(mutex_);
+    std::vector<ProductoDeIsla> encontrados;
+    for (const auto& par : productos_) {
+        auto isla = islas_.find(par.second.isla);
+        bool activa = isla != islas_.end() && isla->second.activa && !isla->second.sinRespuesta;
+        if (activa && aMinusculas(par.second.nombre) == aMinusculas(nombre)) encontrados.push_back(par.second);
+    }
+    return encontrados;
+}
+
+std::string TablaIslas::estado(const IslaRuta& isla) {
+    if (!isla.activa) return "de-baja";
+    if (isla.sinRespuesta) return "sin-respuesta";
+    return "activa";
 }
 
 std::vector<IslaRuta> TablaIslas::todas() {
@@ -47,7 +86,7 @@ std::vector<IslaRuta> TablaIslas::activas() {
     std::lock_guard<std::mutex> lock(mutex_);
     std::vector<IslaRuta> lista;
     for (const auto& par : islas_) {
-        if (par.second.activa) lista.push_back(par.second);
+        if (par.second.activa && !par.second.sinRespuesta) lista.push_back(par.second);
     }
     return lista;
 }
