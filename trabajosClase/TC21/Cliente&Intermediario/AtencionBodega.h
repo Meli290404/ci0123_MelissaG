@@ -21,6 +21,7 @@ private:
     std::string listaCategorias(const std::string& destino);
     std::string listaProductos(const Mensaje& msg, const std::string& destino);
     std::string reservar(const Mensaje& msg, const std::string& destino);
+    std::string devolver(const Mensaje& msg, const std::string& destino);
     std::string errorFormato(const std::string& destino, const std::string& tipoOriginal,
                              const std::string& campo, const std::string& valor);
 };
