@@ -32,6 +32,8 @@ const int TIPO_PRODUCT_LIST       = 22;
 const int TIPO_PRODUCT_NOT_FOUND  = 27;
 const int TIPO_RESERVE_STOCK      = 50;
 const int TIPO_RESERVED           = 51;
+const int TIPO_RELEASE_STOCK      = 52;   // INT_04|SERV_NN/52/<producto>/<cantidad>: devolver lo reservado
+const int TIPO_RELEASED           = 53;   // SERV_NN|INT_04/53/<producto>/<cantidad devuelta>
 
 // descubrimiento, por udp
 const int TIPO_BUSCO_INTERMEDIARIO = 80;  // SERV_NN|BROADCAST/80/<puerto tcp>/<count>/<cat,cat,...>
