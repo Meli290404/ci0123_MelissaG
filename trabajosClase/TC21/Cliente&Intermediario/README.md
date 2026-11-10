@@ -74,6 +74,31 @@ Cómo la usa el intermediario:
 
 Clases y archivos nuevos: `TablaRutas.h/.cc`, `Descubrimiento.h/.cc`. Métodos nuevos en `VSocket`: `HabilitarBroadcast()` y `ArmarDireccion()`; `Bind(int)` ahora usa `SO_REUSEADDR`.
 
+## Descubrimiento entre islas (protocolo mancomunado)
+
+Para hablar con los intermediarios de otras islas se usa el protocolo mancomunado del grupo 2: `TIPO/campos`, sin origen ni destino. El intermediario abre un segundo socket UDP en el puerto **9090**, ligado a todas las interfaces y con broadcast habilitado.
+
+| Tipo | Formato | Cuándo |
+|---|---|---|
+| **60** ANNOUNCE | `60/ID_MSG/INT_04/<ip privada>/9090` | Al arrancar (el mismo 60 dos veces) y cada vez que aparece una isla nueva |
+| **61** ANNOUNCE_BYE | `61/INT_04` | Al apagar el intermediario con `Ctrl+C` o `kill` |
+
+Los dos van al broadcast dirigido de cada isla: `172.16.123.15, .31, .47, .63, .79, .95, .111`. Nunca a `255.255.255.255`.
+
+Hilos nuevos del intermediario:
+
+- **`escucharIslas`**: espera en `recvFrom` en el UDP 9090. Con un 60 válido registra la isla en la `TablaIslas`; con un 61 la deja de baja. Lo que no cumple el formato se descarta (por UDP no hay conexión por donde contestar un 02).
+- **`anunciarAlArrancar`**: manda el 60 inicial.
+- **`esperarApagado`**: espera la señal con `sigwait` y manda el 61 antes de terminar.
+
+Reglas:
+
+- **Duplicados y ecos**: cada 60 lleva un `ID_MSG` distinto. Si llega otra vez el mismo `id_isla/ID_MSG` en menos de 60 s, se descarta. El eco del propio 60 se descarta por el `id_isla`. El `ID_MSG` arranca en un número al azar, para que un intermediario que se reinicia no parezca repetido.
+- **Isla que arranca después**: cuando llega el 60 de una isla **nueva**, el intermediario se vuelve a anunciar, porque esa isla no oyó el 60 inicial. Las islas que ya lo conocían lo reciben como igual y no contestan, así que no se forma un bucle.
+- **Sin heartbeat**: una isla queda `activa` hasta que manda su 61.
+
+La tabla de islas se ve en `/rutas` y en el comando `RUTAS` del cliente.
+
 ## Compilar
 
 ```
@@ -106,7 +131,7 @@ La IP es el número después de `inet` y el broadcast el número después de `br
 
 ```
 ./servidorProductos <numero> <ip> [archivo] [broadcast]
-./intermediario <ip clientes> <ip red de servidores> [broadcast]
+./intermediario <ip clientes> <ip red de servidores> [broadcast] [-isla NN] [-islas b1,b2,...] [-puerto N] [-http N]
 ./cliente <ip del intermediario>
 ```
 
@@ -164,6 +189,20 @@ El intermediario muestra `aviso: SERV_03 repite la categoria frutas (SERV_02)` y
 
 Navegador: `http://<ip>:8080/` (inventario por servidor) y `http://<ip>:8080/rutas` (tabla de rutas).
 
+### Probar varias islas en una sola computadora
+
+Cada intermediario se identifica con `-isla`, atiende clientes en otro puerto con `-http` y anuncia otro puerto con `-puerto`. `-islas` cambia la lista de broadcasts por el de la red de la computadora (el número después de `brd` en `ip -4 addr`):
+
+```
+./intermediario <ip> <ip> -isla 04 -islas <brd> -http 8080 -puerto 9090
+./intermediario <ip> <ip> -isla 05 -islas <brd> -http 8081 -puerto 9190
+./intermediario <ip> <ip> -isla 06 -islas <brd> -http 8082 -puerto 9290
+```
+
+Después de arrancar las tres, cada una tiene a las otras dos en `http://<ip>:808X/rutas`. Con `Ctrl+C` en la 05, las otras la muestran `de-baja`; al volver a levantarla, aparece `activa` otra vez.
+
+En el laboratorio no hacen falta las opciones: `./intermediario <ip publica> 172.16.123.6X` anuncia como `INT_04` a las siete islas.
+
 ## Administrar las bodegas
 
 ```
@@ -184,6 +223,7 @@ Para ver el archivo por dentro: `hexdump -C fs1.dat.ci0123 | less`.
 ## Problemas comunes
 
 - **`no se encontro la direccion de broadcast`**: la IP no es de ninguna interfaz. Revisar con `ip -4 addr` o pasar el broadcast como último argumento.
+- **Las otras islas no aparecen**: el firewall debe dejar pasar UDP 9090 (`sudo ufw allow 9090/udp`), y el switch L3 debe permitir el broadcast dirigido hacia cada VLAN.
 - **El cliente dice `el intermediario todavia no ha descubierto ningun servidor`**: ningún servidor contestó el 82. Revisar que estén en la misma red y que el firewall deje pasar UDP 9091 y 9092 (`sudo ufw allow 9091/udp`, `sudo ufw allow 9092/udp`).
 - **`Address already in use`** en TCP: ya hay un servidor con ese mismo número. Cada servidor necesita un número distinto.
 - **Dos servidores en la misma computadora**: los dos escuchan UDP 9092 (gracias a `SO_REUSEADDR`) y a los dos les llega el 82. El 81, que va directo, solo le llega a uno, así que el otro sigue mandando su 80 hasta 3 veces; no afecta, porque igual queda registrado.
