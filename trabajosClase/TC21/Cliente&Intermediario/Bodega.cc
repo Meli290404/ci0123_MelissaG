@@ -133,6 +133,23 @@ ResultadoStock Bodega::descontarStock(const std::string& nombre, int cantidad, i
     return PRODUCTO_NO_EXISTE;
 }
 
+bool Bodega::devolverStock(const std::string& nombre, int cantidad, int& devuelto) {
+    std::lock_guard<std::mutex> lock(fs_.mutex());
+
+    std::vector<LineaProducto> lineas = leerSinCandado();
+    for (auto& p : lineas) {
+        if (p.nombre != nombre) continue;
+
+        devuelto = (p.cantidad + cantidad > 99999) ? 99999 - p.cantidad : cantidad;
+        if (devuelto > 0) {
+            p.cantidad += devuelto;
+            guardarSinCandado(lineas);
+        }
+        return true;
+    }
+    return false;
+}
+
 bool Bodega::reservarStock(const std::string& nombre, int pedido, int& reservado, uint32_t& precioCentavos) {
     std::lock_guard<std::mutex> lock(fs_.mutex());
 

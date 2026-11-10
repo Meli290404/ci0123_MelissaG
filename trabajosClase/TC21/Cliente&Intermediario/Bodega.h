@@ -49,6 +49,10 @@ public:
     // devuelve false si el producto no esta en esta bodega
     bool reservarStock(const std::string& nombre, int pedido, int& reservado, uint32_t& precioCentavos);
 
+    // suma al producto lo que se habia reservado y no se uso. la cantidad de la linea tiene como maximo
+    // 5 digitos, asi que nunca pasa de 99999. devuelve false si el producto no esta en esta bodega
+    bool devolverStock(const std::string& nombre, int cantidad, int& devuelto);
+
 private:
     Filesystem& fs_;
     uint16_t inodo_;
