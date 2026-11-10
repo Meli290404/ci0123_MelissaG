@@ -8,6 +8,9 @@
 // arma el html de las paginas. no sabe de donde vienen los datos: recibe las vistas ya llenas
 class PaginaWeb {
 public:
+    // pagina de inicio: un boton por cada pagina, con cuantos servidores e islas hay activos
+    std::string menu(int servidoresActivos, int islasActivas);
+
     std::string inventario(const std::vector<BodegaVista>& bodegas);
     std::string error(int codigo, const std::string& mensaje);
 
