@@ -18,10 +18,15 @@
 #include "Validaciones.h"
 #include "Mancomunado.h"
 #include "TablaIslas.h"
+#include "Reservas.h"
+#include "AtencionIsla.h"
 
 static const int PUERTO_CLIENTES = 8080;
 static const int SEGUNDOS_ENTRE_82 = 10;   // menos que TablaRutas::SEGUNDOS_VIGENCIA
 static const int VECES_ANUNCIO_INICIAL = 2;   // el mismo 60 se repite por si se pierde un datagrama
+static const int SEGUNDOS_ESPERA_ISLA = 5;     // timeout recomendado por el mancomunado
+static const int SEGUNDOS_ENTRE_VENCIMIENTOS = 5;
+static const size_t MAX_SOLICITUD_ISLA = 65536;  // el mancomunado no tiene maximo; esto evita llenar la memoria
 
 // datos de esta isla para el protocolo mancomunado
 struct DatosIsla {
@@ -288,6 +293,77 @@ void esperarApagado(Socket* udp, DatosIsla isla, sigset_t senales) {
     std::exit(0);
 }
 
+// lee una solicitud de otra isla. el mancomunado no dice como termina un mensaje: se lee hasta el
+// '\n', hasta que la otra isla cierre su lado, o hasta que pase un segundo sin datos nuevos.
+// si en SEGUNDOS_ESPERA_ISLA no llega nada, se devuelve vacio
+static std::string leerSolicitudIsla(VSocket* conexion) {
+    char buf[1024];
+    std::string acumulado;
+    conexion->TiempoMaximoLectura(SEGUNDOS_ESPERA_ISLA);
+    while (acumulado.find('\n') == std::string::npos && acumulado.size() <= MAX_SOLICITUD_ISLA) {
+        size_t leidos = 0;
+        try {
+            leidos = conexion->Read(buf, sizeof(buf));
+        } catch (const std::exception&) {
+            break;   // se cumplio el tiempo de espera
+        }
+        if (leidos == 0) break;
+        acumulado.append(buf, leidos);
+        conexion->TiempoMaximoLectura(1);
+    }
+    size_t fin = acumulado.find('\n');
+    if (fin != std::string::npos) acumulado.erase(fin);
+    if (!acumulado.empty() && acumulado.back() == '\r') acumulado.pop_back();
+    return acumulado;
+}
+
+// hilo por cada conexion tcp de otra isla: una solicitud y una respuesta, y se cierra
+void atenderIsla(VSocket* conexion, TablaRutas* rutas, Reservas* reservas) {
+    std::string ip = conexion->IpRemota();
+    try {
+        std::string solicitud = leerSolicitudIsla(conexion);
+        if (solicitud.empty()) {
+            std::cout << "[MAN TCP " << ip << "] no mando ninguna solicitud, se cierra\n";
+        } else {
+            std::cout << "[MAN TCP " << ip << " -> INT] " << solicitud << "\n";
+            AtencionIsla atencion(*rutas, *reservas);
+            std::string respuesta = atencion.responder(solicitud, ip);
+            conexion->Write((respuesta + "\n").c_str());
+            std::cout << "[MAN TCP INT -> " << ip << "] " << respuesta << "\n";
+        }
+    } catch (const std::exception& e) {
+        std::cerr << "error atendiendo a la isla " << ip << ": " << e.what() << "\n";
+    }
+    conexion->Close();
+    delete conexion;
+}
+
+// hilo que acepta las conexiones tcp de las otras islas en el puerto que se anuncia en el 60
+void aceptarIslas(VSocket* servidorIslas, TablaRutas* rutas, Reservas* reservas) {
+    for (;;) {
+        try {
+            VSocket* conexion = servidorIslas->AcceptConnection();
+            std::thread trabajador(atenderIsla, conexion, rutas, reservas);
+            trabajador.detach();
+        } catch (const std::exception& e) {
+            std::cerr << "error aceptando una isla: " << e.what() << "\n";
+        }
+    }
+}
+
+// hilo que revisa cada pocos segundos las reservas de otras islas que ya vencieron
+// y le devuelve ese stock al servidor de productos con el mensaje interno 52
+void vencerReservas(TablaRutas* rutas, Reservas* reservas) {
+    for (;;) {
+        std::this_thread::sleep_for(std::chrono::seconds(SEGUNDOS_ENTRE_VENCIMIENTOS));
+        for (const auto& r : reservas->sacarVencidas()) {
+            std::cout << "[INT] vencio la reserva de " << r.ipIsla << ": " << r.cantidad << " x " << r.producto
+                      << ", se devuelve a " << r.servidor << "\n";
+            devolverReserva(*rutas, r.servidor, r.producto, r.cantidad);
+        }
+    }
+}
+
 // lista separada por comas
 static std::vector<std::string> separarComas(const std::string& texto) {
     std::vector<std::string> partes;
@@ -380,11 +456,13 @@ int main(int argc, char* argv[]) {
     // las tres se comparten entre todos los hilos y cada una protege sus datos con su propio mutex
     TablaRutas rutas;
     TablaIslas islas;
+    Reservas reservas;
     Carritos carritos;
 
     VSocket* servidor = new Socket('s');
     Socket* udp = new Socket('d');
     Socket* udpIslas = new Socket('d');
+    VSocket* servidorIslas = new Socket('s');
     try {
         servidor->Bind(ipClientes, puertoClientes);
         servidor->MarkPassive(10);
@@ -396,19 +474,24 @@ int main(int argc, char* argv[]) {
         // otro socket udp para el mancomunado, tambien ligado a todas las interfaces
         udpIslas->Bind(PUERTO_MANCOMUNADO);
         udpIslas->HabilitarBroadcast();
+
+        // las otras islas se conectan por la red privada, a la ip y el puerto del 60
+        servidorIslas->Bind(ipPrivada, isla.puerto);
+        servidorIslas->MarkPassive(10);
     } catch (const std::exception& e) {
         std::cerr << "no se pudo abrir el intermediario: " << e.what() << "\n";
         delete servidor;
         delete udp;
         delete udpIslas;
+        delete servidorIslas;
         return 1;
     }
 
     std::cout << "intermediario escuchando en http://" << ipClientes << ":" << puertoClientes << "/\n";
     std::cout << "descubrimiento por udp en el puerto " << PUERTO_UDP_INTERMEDIARIO << ", broadcast " << broadcast << "\n";
     std::cout << "tabla de rutas en http://" << ipClientes << ":" << puertoClientes << "/rutas\n";
-    std::cout << "mancomunado como " << isla.id << " en el puerto udp " << PUERTO_MANCOMUNADO << ", anuncia "
-              << isla.ip << ":" << isla.puerto << "\n";
+    std::cout << "mancomunado como " << isla.id << ": udp " << PUERTO_MANCOMUNADO << " para 60 y 61, tcp "
+              << isla.ip << ":" << isla.puerto << " para 10, 20, 50 y 40\n";
 
     std::thread escucha(escucharServidores, udp, &rutas);
     escucha.detach();
@@ -420,6 +503,10 @@ int main(int argc, char* argv[]) {
     anuncio.detach();
     std::thread apagado(esperarApagado, udpIslas, isla, senales);
     apagado.detach();
+    std::thread aceptaIslas(aceptarIslas, servidorIslas, &rutas, &reservas);
+    aceptaIslas.detach();
+    std::thread vencimientos(vencerReservas, &rutas, &reservas);
+    vencimientos.detach();
 
     for (;;) {
         VSocket* cliente = servidor->AcceptConnection();
