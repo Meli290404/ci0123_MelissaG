@@ -18,7 +18,8 @@ bool Carritos::agregar(int sesion, const ItemReservado& item) {
     if (it == carritos_.end()) return false;
 
     for (auto& existente : it->second) {
-        if (existente.producto == item.producto && existente.precioCentavos == item.precioCentavos) {
+        if (existente.producto == item.producto && existente.precioCentavos == item.precioCentavos &&
+            existente.isla == item.isla) {
             existente.cantidad += item.cantidad;
             return true;
         }

@@ -7,11 +7,13 @@
 #include <mutex>
 #include <cstdint>
 
-// un producto ya reservado en el servidor de productos, con el precio que este confirmo
+// un producto ya reservado, con el precio que se confirmo. si viene de otra isla, isla trae su
+// INT_NN y la reserva vive alla (50 del mancomunado); si no, isla va vacio
 struct ItemReservado {
     std::string producto;
     int cantidad;
     uint32_t precioCentavos;
+    std::string isla;
 };
 
 // guarda el carrito de cada sesion en la memoria del intermediario.
@@ -22,7 +24,7 @@ public:
     int nuevaSesion();
     bool existe(int sesion);
 
-    // si el producto ya estaba con el mismo precio se suman las cantidades
+    // si el producto ya estaba con el mismo precio y de la misma isla se suman las cantidades
     bool agregar(int sesion, const ItemReservado& item);
 
     // entrega los productos del carrito y lo deja vacio
