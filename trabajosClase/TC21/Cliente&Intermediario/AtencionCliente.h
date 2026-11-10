@@ -7,6 +7,7 @@
 #include "Protocolo.h"
 #include "TablaRutas.h"
 #include "TablaIslas.h"
+#include <map>
 #include "Carritos.h"
 #include "PaginaWeb.h"
 
@@ -25,7 +26,11 @@ private:
     Carritos& carritos_;
     PaginaWeb pagina_;
 
-    RespuestaHttp inicio();
+    // pagina de inicio con un boton por pagina
+    RespuestaHttp menu();
+
+    // todos los productos de la isla y de las otras islas, para el navegador
+    RespuestaHttp inventario();
     RespuestaHttp sesion();
     RespuestaHttp categorias();
     RespuestaHttp productos(const std::string& categoria);
@@ -35,10 +40,29 @@ private:
     // tabla de rutas (servidores de la isla y otras islas) para el navegador; se recarga sola cada 2 segundos
     RespuestaHttp paginaRutas();
 
+    // solo los servidores o solo las otras islas; tambien se recargan solas
+    RespuestaHttp paginaServidores();
+    RespuestaHttp paginaIslas();
+
+    // partes de las paginas anteriores. conTitulo pone el subtitulo, que sobra en la pagina que
+    // solo tiene esa tabla porque ya lleva el mismo titulo arriba
+    std::string tablaServidores(const std::vector<ServidorRuta>& servidores, bool conTitulo);
+    std::string tablaRutasCategorias(const std::vector<ServidorRuta>& servidores, int& filas);
+    std::string tablaIslas(const std::vector<IslaRuta>& islas, bool conTitulo);
+
     // envia un mensaje a un servidor de productos y deja la respuesta ya parseada.
     // si no contesta, lo marca sin respuesta y no se usa hasta su proximo 83 (o 80)
     bool consultar(const ServidorRuta& servidor, int tipo, const std::vector<std::string>& campos,
                    Mensaje& respuesta);
+
+    // agrega al carrito un producto de otra isla, reservandolo alla con el 50 del mancomunado.
+    // devuelve true si armo la respuesta; contesto queda en true si alguna isla lo tenia
+    bool agregarDeIsla(int sesionId, const std::string& producto, int pedido, bool& contesto,
+                       RespuestaHttp& resultado);
+
+    // compra con el 40 del mancomunado lo que el carrito tiene reservado en esa isla
+    bool comprarEnIsla(const std::string& idIsla, const std::vector<ItemReservado>& items,
+                       std::map<std::string, uint64_t>& subtotales);
 
     // respuesta para cuando la tabla de rutas no tiene ningun servidor activo
     RespuestaHttp sinServidores();
