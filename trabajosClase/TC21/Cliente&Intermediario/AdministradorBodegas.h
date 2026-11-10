@@ -38,6 +38,9 @@ public:
     // reserva en la bodega donde este el producto; devuelve false si ninguna lo tiene
     bool reservar(const std::string& nombre, int pedido, int& reservado, uint32_t& precioCentavos);
 
+    // devuelve a la bodega donde este el producto lo que se habia reservado; false si ninguna lo tiene
+    bool devolver(const std::string& nombre, int cantidad, int& devuelto);
+
 private:
     Filesystem& fs_;
 

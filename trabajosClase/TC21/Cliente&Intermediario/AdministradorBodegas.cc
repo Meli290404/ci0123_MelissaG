@@ -185,6 +185,13 @@ bool AdministradorBodegas::reservar(const std::string& nombre, int pedido, int& 
     return false;
 }
 
+bool AdministradorBodegas::devolver(const std::string& nombre, int cantidad, int& devuelto) {
+    for (auto& entrada : fs_.listarBodegas()) {
+        if (abrirBodega(fs_, entrada).devolverStock(nombre, cantidad, devuelto)) return true;
+    }
+    return false;
+}
+
 std::string AdministradorBodegas::bodegaConCategoria(const std::string& categoria) {
     for (auto& entrada : fs_.listarBodegas()) {
         if (abrirBodega(fs_, entrada).tieneCategoria(categoria)) {
