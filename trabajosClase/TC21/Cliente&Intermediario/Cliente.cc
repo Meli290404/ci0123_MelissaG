@@ -252,7 +252,7 @@ void comandoFactura() {
     std::cout << "TOTAL: " << extraerAtributo(html, "data-total") << "\n";
 }
 
-// muestra la tabla de rutas del intermediario: servidores descubiertos y categorias de cada uno
+// muestra la tabla de rutas del intermediario: servidores descubiertos con sus categorias y otras islas
 void comandoRutas() {
     int codigo;
     std::string html = pedir("/rutas", codigo);
@@ -260,13 +260,15 @@ void comandoRutas() {
 
     if (extraerAtributo(html, "data-servidores") == "0") {
         std::cout << "  el intermediario todavia no ha descubierto ningun servidor de productos\n";
-        return;
     }
     // las filas de servidores traen data-id y las de rutas traen data-categoria
     for (auto& fila : extraerElementos(html, "tr")) {
         std::string id = extraerAtributo(fila, "data-id");
         std::string categoria = extraerAtributo(fila, "data-categoria");
-        if (!id.empty()) {
+        std::string isla = extraerAtributo(fila, "data-isla");
+        if (!isla.empty()) {
+            std::cout << "  isla " << isla << " | " << extraerAtributo(fila, "data-estado") << "\n";
+        } else if (!id.empty()) {
             std::cout << "  servidor " << id << " | " << extraerAtributo(fila, "data-estado") << "\n";
         } else if (!categoria.empty()) {
             // solo se muestra el estado de la ruta cuando no es la que se usa
