@@ -55,3 +55,24 @@ bool validarPuertoMancomunado(const std::string& s) {
     int puerto = std::stoi(s);
     return puerto >= 1 && puerto <= 65535;
 }
+
+bool validarNombreMancomunado(const std::string& s) {
+    if (s.empty() || s.size() > 50) return false;
+    for (char c : s) {
+        if (!isalnum((unsigned char)c) && c != '_' && c != '-') return false;
+    }
+    return true;
+}
+
+bool validarCantidadMancomunado(const std::string& s) {
+    return s.size() <= 5 && soloDigitos(s);
+}
+
+bool validarCountMancomunado(const std::string& s) {
+    return s.size() <= 3 && soloDigitos(s);
+}
+
+std::string aMinusculas(std::string s) {
+    for (char& c : s) c = (char)tolower((unsigned char)c);
+    return s;
+}

@@ -53,5 +53,11 @@ MensajeMancomunado parsearMancomunado(const std::string& linea);
 bool validarIdMensaje(const std::string& s);           // ^[0-9]{4}$
 bool validarIdIsla(const std::string& s);              // ^INT_[0-9]{2}$
 bool validarPuertoMancomunado(const std::string& s);   // ^[0-9]{1,5}$, de 1 a 65535
+bool validarNombreMancomunado(const std::string& s);   // categoria y producto: ^[a-zA-Z0-9_\-]{1,50}$
+bool validarCantidadMancomunado(const std::string& s); // ^[0-9]{1,5}$
+bool validarCountMancomunado(const std::string& s);    // ^[0-9]{1,3}$
+
+// el mancomunado busca sin importar mayusculas: la isla convierte a minusculas antes de buscar
+std::string aMinusculas(std::string s);
 
 #endif
