@@ -44,8 +44,8 @@ static std::string centavosATexto(uint64_t centavos) {
     return buf;
 }
 
-AtencionCliente::AtencionCliente(TablaRutas& rutas, Carritos& carritos)
-    : rutas_(rutas), carritos_(carritos) {}
+AtencionCliente::AtencionCliente(TablaRutas& rutas, TablaIslas& islas, Carritos& carritos)
+    : rutas_(rutas), islas_(islas), carritos_(carritos) {}
 
 RespuestaHttp AtencionCliente::responder(const std::string& peticion) {
     if (peticion.rfind("GET ", 0) != 0) {
@@ -347,9 +347,22 @@ RespuestaHttp AtencionCliente::paginaRutas() {
     oss << "</table>\n";
     if (servidores.empty()) oss << "<p>Todavía no se ha descubierto ningún servidor de productos.</p>\n";
 
+    // otras islas descubiertas con el 60 del mancomunado
+    std::vector<IslaRuta> islas = islas_.todas();
+    oss << "<h2>Otras islas</h2>\n<table class=\"islas\">\n"
+        << "<tr><th>Isla</th><th>Dirección</th><th>Estado</th><th>Último anuncio</th></tr>\n";
+    for (const auto& isla : islas) {
+        std::string estado = isla.activa ? "activa" : "de-baja";
+        oss << "<tr data-isla=\"" << isla.id << "\" data-estado=\"" << estado << "\"><td>" << isla.id << "</td><td>"
+            << isla.ip << ":" << isla.puerto << "</td><td>" << estado << "</td><td>hace "
+            << (time(nullptr) - isla.ultimoAnuncio) << " s</td></tr>\n";
+    }
+    oss << "</table>\n";
+    if (islas.empty()) oss << "<p>Todavía no se ha descubierto ninguna otra isla.</p>\n";
+
     return respuesta(200, "Tabla de rutas", "ok",
                      "data-servidores=\"" + std::to_string(servidores.size()) + "\" data-rutas=\"" +
-                     std::to_string(filas) + "\"", oss.str());
+                     std::to_string(filas) + "\" data-islas=\"" + std::to_string(islas.size()) + "\"", oss.str());
 }
 
 RespuestaHttp AtencionCliente::sinServidores() {

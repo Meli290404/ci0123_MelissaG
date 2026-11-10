@@ -6,6 +6,7 @@
 #include "HttpUtil.h"
 #include "Protocolo.h"
 #include "TablaRutas.h"
+#include "TablaIslas.h"
 #include "Carritos.h"
 #include "PaginaWeb.h"
 
@@ -14,12 +15,13 @@
 // no maneja el socket del cliente
 class AtencionCliente {
 public:
-    AtencionCliente(TablaRutas& rutas, Carritos& carritos);
+    AtencionCliente(TablaRutas& rutas, TablaIslas& islas, Carritos& carritos);
 
     RespuestaHttp responder(const std::string& peticion);
 
 private:
     TablaRutas& rutas_;
+    TablaIslas& islas_;
     Carritos& carritos_;
     PaginaWeb pagina_;
 
@@ -30,7 +32,7 @@ private:
     RespuestaHttp agregar(const std::string& sesionTexto, const std::string& producto, const std::string& cantidadTexto);
     RespuestaHttp factura(const std::string& sesionTexto);
 
-    // tabla de rutas para el navegador; se recarga sola cada 2 segundos
+    // tabla de rutas (servidores de la isla y otras islas) para el navegador; se recarga sola cada 2 segundos
     RespuestaHttp paginaRutas();
 
     // envia un mensaje a un servidor de productos y deja la respuesta ya parseada.
