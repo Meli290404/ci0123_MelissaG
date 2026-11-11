@@ -1,0 +1,115 @@
+! ============================================================
+!  l3 del grupo 2 - ruteador entre las islas 1 a 5
+!  cada isla: su vlan, un puerto troncal hacia su l2 y una ip que es el gateway de la isla
+!
+!  isla  vlan  puerto l3   gateway          red
+!   1    210   fa0/1       172.16.123.17     172.16.123.16/28
+!   2    220   fa0/2       172.16.123.33     172.16.123.32/28
+!   3    230   fa0/3       172.16.123.49     172.16.123.48/28
+!   4    240   fa0/4       172.16.123.65     172.16.123.64/28
+!   5    250   fa0/5       172.16.123.81     172.16.123.80/28
+! ============================================================
+
+enable
+configure terminal
+hostname L3-GRUPO2
+no ip domain-lookup
+
+! los mensajes del switch no interrumpen lo que se esta escribiendo en la consola
+line console 0
+ logging synchronous
+exit
+
+! sin esto el l3 se comporta como un switch comun y las islas no se ven entre si
+ip routing
+
+! ---------- 1. vlans ----------
+vlan 210
+ name VLAN210-ISLA1
+exit
+vlan 220
+ name VLAN220-ISLA2
+exit
+vlan 230
+ name VLAN230-ISLA3
+exit
+vlan 240
+ name VLAN240-ISLA4
+exit
+vlan 250
+ name VLAN250-ISLA5
+exit
+
+! ---------- 2. puertos hacia los l2 ----------
+! lo comun a los cinco puertos se configura de una vez con range
+interface range FastEthernet0/1 - 5
+ switchport trunk encapsulation dot1q
+ switchport mode trunk
+ no shutdown
+exit
+
+! despues cada puerto deja pasar solo la vlan de su isla
+interface FastEthernet0/1
+ description hacia el l2 de la isla 1
+ switchport trunk allowed vlan 210
+exit
+interface FastEthernet0/2
+ description hacia el l2 de la isla 2
+ switchport trunk allowed vlan 220
+exit
+interface FastEthernet0/3
+ description hacia el l2 de la isla 3
+ switchport trunk allowed vlan 230
+exit
+interface FastEthernet0/4
+ description hacia el l2 de la isla 4
+ switchport trunk allowed vlan 240
+exit
+interface FastEthernet0/5
+ description hacia el l2 de la isla 5
+ switchport trunk allowed vlan 250
+exit
+
+! ---------- 3. gateways de las islas ----------
+! cada interfaz vlan es la puerta de salida de su isla.
+! ip directed-broadcast: el l3 entrega dentro de la isla los paquetes que vienen de otra red
+! dirigidos a su broadcast (.15, .31, ...); el protocolo mancomunado anuncia asi el 60 y el 61
+interface vlan 210
+ description gateway de la isla 1
+ ip address 172.16.123.17 255.255.255.240
+ ip directed-broadcast
+ no shutdown
+exit
+interface vlan 220
+ description gateway de la isla 2
+ ip address 172.16.123.33 255.255.255.240
+ ip directed-broadcast
+ no shutdown
+exit
+interface vlan 230
+ description gateway de la isla 3
+ ip address 172.16.123.49 255.255.255.240
+ ip directed-broadcast
+ no shutdown
+exit
+interface vlan 240
+ description gateway de la isla 4
+ ip address 172.16.123.65 255.255.255.240
+ ip directed-broadcast
+ no shutdown
+exit
+interface vlan 250
+ description gateway de la isla 5
+ ip address 172.16.123.81 255.255.255.240
+ ip directed-broadcast
+ no shutdown
+exit
+
+end
+write memory
+
+! ---------- comprobar ----------
+! show ip interface brief         las vlan 210,220,230,240,250 up/up con su ip
+! show interfaces trunk           fa0/1 a fa0/5 como trunk, cada uno con su vlan
+! show ip route                   una ruta "C" (conectada) por cada isla
+! ping 172.16.123.66              llega al l2 de la isla 4

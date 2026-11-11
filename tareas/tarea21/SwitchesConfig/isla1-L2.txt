@@ -1,0 +1,66 @@
+! ============================================================
+!  l2 2960 - isla 1 - grupo 2
+!  red de la isla: 172.16.123.16/28, vlan 210
+!  .17 = l3 (gateway)   .18 = este switch   .31 = broadcast
+!  el gigabitethernet0/1 de este switch se conecta al fastethernet0/1 del l3
+! ============================================================
+
+enable
+configure terminal
+hostname SW-I1-G2
+no ip domain-lookup
+
+! los mensajes del switch no interrumpen lo que se esta escribiendo en la consola
+line console 0
+ logging synchronous
+exit
+
+! ---------- red de la isla ----------
+vlan 210
+ name VLAN210-ISLA1
+exit
+
+! interfaz virtual de la vlan: solo sirve para llegar al switch (ping, ssh), no rutea
+interface vlan 210
+ description administracion del switch de la isla 1
+ ip address 172.16.123.18 255.255.255.240
+ no shutdown
+exit
+
+! hacia donde manda el switch lo que va para otra red
+ip default-gateway 172.16.123.17
+
+! ---------- enlace con el l3 ----------
+! troncal 802.1q; aunque solo lleva la vlan 210, la etiqueta permite que el l3 sepa de que isla viene
+interface GigabitEthernet0/1
+ description enlace al l3 del grupo 2 (fa0/1)
+ switchport mode trunk
+ switchport trunk allowed vlan 210
+exit
+
+! ---------- puertos de las computadoras ----------
+! cada puerto pertenece solo a la vlan 210; portfast porque ahi no se conectan otros switches
+interface range FastEthernet0/1 - 12
+ description computadoras de la isla 1
+ switchport mode access
+ switchport access vlan 210
+ spanning-tree portfast
+exit
+
+! ---------- dhcp ----------
+! primero se apartan las ips fijas (l3 y switch) para que el dhcp no las entregue
+ip dhcp excluded-address 172.16.123.17 172.16.123.18
+ip dhcp pool POOL-ISLA1
+ network 172.16.123.16 255.255.255.240
+ default-router 172.16.123.17
+exit
+
+end
+write memory
+
+! ---------- comprobar ----------
+! show interfaces status          fa0/1-12 en la vlan 210, gi0/1 como trunk
+! show interfaces trunk           vlan 210 permitida en gi0/1
+! show ip interface brief         vlan210 up/up con la .18
+! ping 172.16.123.17           llega al l3
+! show ip dhcp binding            computadoras que ya recibieron ip
