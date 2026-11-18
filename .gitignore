@@ -3,13 +3,23 @@
 *.exe
 *.o
 
-# certificado y llave privada 
+# certificado y llave privada
 *.pem
+certificados/
 
-# logs que uses para debug (ej. redirigiendo la salida del servidor)
+# logs que uses para debug 
 *.log
 
-# core dumps, por si algun servidor crashea 
+# archivos del filesystem que crean los scripts de inventario
+*.dat.ci0123
+
+# ejecutables que genera make
+servidorProductos
+intermediario
+cliente
+adminBodegas
+
+# core dumps, por si algun servidor crashea
 core
 
 # archivos de respaldo que dejan algunos editores (vim, emacs, etc.)
