@@ -1,0 +1,126 @@
+#include "AtencionBodega.h"
+#include "Validaciones.h"
+#include <cstring>
+#include <stdexcept>
+
+// un valor recibido con / o | romperia la respuesta de error que lo devuelve
+static std::string limpiarValor(std::string valor) {
+    for (char& c : valor) {
+        if (c == '/' || c == '|') c = '_';
+    }
+    return valor;
+}
+
+AtencionBodega::AtencionBodega(AdministradorBodegas& admin, const std::string& idServidor)
+    : admin_(admin), idServidor_(idServidor) {}
+
+std::string AtencionBodega::responder(const std::string& texto) {
+    Mensaje msg;
+    try {
+        msg = parsearMensaje(texto);
+    } catch (const std::exception&) {
+        return construirMensaje(idServidor_, ID_INTERMEDIARIO, TIPO_ERR_FORMATO, {"00", "mensaje", "invalido"});
+    }
+
+    // la respuesta va a quien envio el mensaje, si su id es valido
+    std::string destino = validarOrigenDestino(msg.origen) ? msg.origen : ID_INTERMEDIARIO;
+    std::string tipoOriginal = std::to_string(msg.tipo);
+
+    // solo un intermediario puede hablar con el servidor de productos
+    if (!validarOrigenDestino(msg.origen) || msg.origen.rfind("INT_", 0) != 0) {
+        return errorFormato(destino, tipoOriginal, "origen", msg.origen);
+    }
+    if (msg.destino != idServidor_) {
+        return errorFormato(destino, tipoOriginal, "destino", msg.destino);
+    }
+
+    switch (msg.tipo) {
+        case TIPO_REQUEST_CATEGORIES:
+            return listaCategorias(destino);
+        case TIPO_REQUEST_PRODUCTS:
+            return listaProductos(msg, destino);
+        case TIPO_RESERVE_STOCK:
+            return reservar(msg, destino);
+        case TIPO_RELEASE_STOCK:
+            return devolver(msg, destino);
+        default:
+            return errorFormato(destino, tipoOriginal, "tipo_mensaje", tipoOriginal);
+    }
+}
+
+// lista con el formato categoria,categoria,categoria (escenario 1 del protocolo)
+std::string AtencionBodega::listaCategorias(const std::string& destino) {
+    std::string lista;
+    for (const auto& categoria : admin_.listarCategorias()) {
+        if (!lista.empty()) lista += ",";
+        lista += categoria;
+    }
+    return construirMensaje(idServidor_, destino, TIPO_CATEGORY_LIST, {lista});
+}
+
+std::string AtencionBodega::listaProductos(const Mensaje& msg, const std::string& destino) {
+    if (msg.campos.empty() || !validarCategoria(msg.campos[0])) {
+        return errorFormato(destino, std::to_string(msg.tipo), "categoria", msg.campos.empty() ? "" : msg.campos[0]);
+    }
+
+    // una categoria que no existe se responde igual que una vacia: 22/0
+    std::vector<LineaProducto> productos;
+    admin_.productosDeCategoria(msg.campos[0], productos);
+
+    if (productos.empty()) {
+        return construirMensaje(idServidor_, destino, TIPO_PRODUCT_LIST, {"0"});
+    }
+
+    // lista con el formato nombre,precio,stock;nombre,precio,stock
+    std::string lista;
+    for (const auto& p : productos) {
+        if (!lista.empty()) lista += ";";
+        lista += p.nombre + "," + precioATexto(p.precioCentavos) + "," +
+                 std::to_string(p.cantidad);
+    }
+    return construirMensaje(idServidor_, destino, TIPO_PRODUCT_LIST, {std::to_string(productos.size()), lista});
+}
+
+std::string AtencionBodega::reservar(const Mensaje& msg, const std::string& destino) {
+    std::string tipoOriginal = std::to_string(msg.tipo);
+    if (msg.campos.size() < 2 || !validarProducto(msg.campos[0])) {
+        return errorFormato(destino, tipoOriginal, "producto", msg.campos.empty() ? "" : msg.campos[0]);
+    }
+    if (!validarCount(msg.campos[1])) {
+        return errorFormato(destino, tipoOriginal, "cantidad", msg.campos[1]);
+    }
+
+    int reservado = 0;
+    uint32_t precioCentavos = 0;
+    if (!admin_.reservar(msg.campos[0], std::stoi(msg.campos[1]), reservado, precioCentavos)) {
+        return construirMensaje(idServidor_, destino, TIPO_PRODUCT_NOT_FOUND, {msg.campos[0]});
+    }
+
+    // reservado puede ser menor al pedido, o 0, si no habia suficiente stock
+    return construirMensaje(idServidor_, destino, TIPO_RESERVED,
+                            {msg.campos[0], precioATexto(precioCentavos), std::to_string(reservado)});
+}
+
+// mensaje 52: el intermediario devuelve lo que habia reservado y no se uso; se contesta 53
+// con lo que se sumo de vuelta, o 27 si el producto ya no existe
+std::string AtencionBodega::devolver(const Mensaje& msg, const std::string& destino) {
+    std::string tipoOriginal = std::to_string(msg.tipo);
+    if (msg.campos.size() < 2 || !validarProducto(msg.campos[0])) {
+        return errorFormato(destino, tipoOriginal, "producto", msg.campos.empty() ? "" : msg.campos[0]);
+    }
+    if (!validarCount(msg.campos[1])) {
+        return errorFormato(destino, tipoOriginal, "cantidad", msg.campos[1]);
+    }
+
+    int devuelto = 0;
+    if (!admin_.devolver(msg.campos[0], std::stoi(msg.campos[1]), devuelto)) {
+        return construirMensaje(idServidor_, destino, TIPO_PRODUCT_NOT_FOUND, {msg.campos[0]});
+    }
+    return construirMensaje(idServidor_, destino, TIPO_RELEASED, {msg.campos[0], std::to_string(devuelto)});
+}
+
+// mensaje 90: tipo original, campo invalido y valor recibido
+std::string AtencionBodega::errorFormato(const std::string& destino, const std::string& tipoOriginal,
+                                         const std::string& campo, const std::string& valor) {
+    return construirMensaje(idServidor_, destino, TIPO_ERR_FORMATO, {tipoOriginal, campo, limpiarValor(valor)});
+}
